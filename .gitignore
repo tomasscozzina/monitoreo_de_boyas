@@ -1,0 +1,18 @@
+# Carpetas del IDE
+.metadata/
+.settings/
+
+# Carpetas de compilación
+Debug/
+Release/
+bin/
+obj/
+
+# Archivos temporales
+*.bak
+*.o
+*.d
+*.su
+*.elf
+*.list
+*.map
