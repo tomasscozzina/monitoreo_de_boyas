@@ -1252,8 +1252,8 @@ int16_t LoRaWANNode::isValidUplink(size_t len, uint8_t fPort) {
 
 void LoRaWANNode::adrBackoff() {
   // check if we need to do ADR stuff
-  uint32_t adrLimit = 0x01 << this->adrLimitExp;
-  uint32_t adrDelay = 0x01 << this->adrDelayExp;
+  uint32_t adrLimit = 0x01 << this->adrLimitExp;	// adrLimit = 64
+  uint32_t adrDelay = 0x01 << this->adrDelayExp;	// adrDelay = 32
 
   // check if we already tried everything (adrFCnt == FCNT_NONE)
   if(this->adrFCnt == RADIOLIB_LORAWAN_FCNT_NONE) {

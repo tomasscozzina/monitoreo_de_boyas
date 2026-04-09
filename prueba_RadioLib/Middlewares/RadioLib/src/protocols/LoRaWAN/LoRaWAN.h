@@ -66,8 +66,8 @@
 #define RADIOLIB_LORAWAN_RX1_DR_OFFSET                          (0)
 #define RADIOLIB_LORAWAN_JOIN_ACCEPT_DELAY_1_MS                 (5000)
 #define RADIOLIB_LORAWAN_JOIN_ACCEPT_DELAY_2_MS                 (6000)
-#define RADIOLIB_LORAWAN_ADR_ACK_LIMIT_EXP                      (0x06)
-#define RADIOLIB_LORAWAN_ADR_ACK_DELAY_EXP                      (0x05)
+#define RADIOLIB_LORAWAN_ADR_ACK_LIMIT_EXP                      (0x02)		// TOMI: valor original (0x06)
+#define RADIOLIB_LORAWAN_ADR_ACK_DELAY_EXP                      (0x01)		// TOMI: valor original (0x05)
 #define RADIOLIB_LORAWAN_RETRANSMIT_TIMEOUT_MIN_MS              (1000)
 #define RADIOLIB_LORAWAN_RETRANSMIT_TIMEOUT_MAX_MS              (3000)
 #define RADIOLIB_LORAWAN_POWER_STEP_SIZE_DBM                    (-2)
@@ -986,7 +986,7 @@ class LoRaWANNode {
       500 is the **maximum** value, but it is not a good idea to go anywhere near that.
       If you have to go above 50 you probably have a bug somewhere. Check your device timing.
     */
-    RadioLibTime_t scanGuard = 10;
+    RadioLibTime_t scanGuard = 200;		// TOMI: El valor original es 10, lo tuve que subir para que funciones con SF12 y SF11
 
 #if !RADIOLIB_GODMODE
   protected:

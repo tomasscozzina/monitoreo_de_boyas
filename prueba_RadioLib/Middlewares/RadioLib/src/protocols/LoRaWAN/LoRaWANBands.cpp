@@ -251,7 +251,7 @@ const LoRaWANBand_t AU915 = {
   .powerMax = 30,	// potencia máxima de la banda en dBm
   .powerNumSteps = 10,	// número de saltos de potencia de la banda
   .dutyCycle = 0,	// número de ms por hora de time on air permitido (0 = desactivado I guess..)
-  .dwellTimeUp = RADIOLIB_LORAWAN_DWELL_TIME,	// número de ms por uplink permitido
+  .dwellTimeUp = 0, // TOMI: desactivé el DWELL TIME, el valor original es RADIOLIB_LORAWAN_DWELL_TIME
   .dwellTimeDn = 0,	// número de ms por downlink permitido
   .txParamSupported = true,	// si esta banda soporta el comando MAC TxParamSetupReq
   .txFreqs = {	// set de canales uplink por defecto para bandas dinámicas
@@ -261,7 +261,7 @@ const LoRaWANBand_t AU915 = {
   },
 
   /*
-   * La Sub Banda 2 de la Banda AU915, está compuesta de los canales:
+   * TOMI: La Sub Banda 2 de la Banda AU915, está compuesta de los canales:
    *
    * 			8 a 15 (BW=125) y 65 (BW=500) para Tx
    * 			0 a 7 (BW=500) para Rx
@@ -299,7 +299,7 @@ const LoRaWANBand_t AU915 = {
       .freqStep = 2000,
       .drMin = 0,
       .drMax = 5,
-      .drJoinRequest = 2
+      .drJoinRequest = 0	// TOMI: es 2 originalmente
     },
     {	// en la especificación de parámetros regionales, los espectros azules
       .numChannels = 8,
@@ -307,7 +307,7 @@ const LoRaWANBand_t AU915 = {
       .freqStep = 16000,
       .drMin = 6,
       .drMax = 6,
-      .drJoinRequest = 6
+      .drJoinRequest = 6	// TOMI: es 6 originalmente
     }
   },	// en la especificación de parámetros regionales, los espectros naranjas
   .rx1Span = {
@@ -346,7 +346,7 @@ const LoRaWANBand_t AU915 = {
   },
 
   /*
-   * El arreglo que sigue es la lista de todos los Data Rate (DR) utilizados en esta banda.
+   * TOMI: El arreglo que sigue es la lista de todos los Data Rate (DR) utilizados en esta banda.
    * Van del DR0 al DR14 (15 configuraciones distintas) en orden descendente.
    * Cada DR determina, principalmente, el spreading factor (SF), el ancho de banda (BW), el coding rate (CR) y
    * el tamaño máximo del Payload en bytes (PayloadLenMax).

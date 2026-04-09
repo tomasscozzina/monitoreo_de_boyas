@@ -18,7 +18,7 @@ int main(void){
 		uplink.payload = texto_payload;
 		uplink.len = (uint8_t)len;
 		uplink.port = PERIODIC_TRANSMISSION_PORT;
-		uplink.confirmed = false;
+		uplink.confirmed = true;
 
 		lorawan_send(&uplink, &downlink);
 

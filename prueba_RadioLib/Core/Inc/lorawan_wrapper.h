@@ -37,10 +37,10 @@ extern "C"
 
     void lorawan_init(void);
     void lorawan_configure(const lorawan_credentials_t *cred);
-    void lorawan_join(void);
     void lorawan_session_restore(void);
-    void lorawan_send(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
+    void lorawan_join(void);
     void lorawan_session_save(void);
+    void lorawan_send(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
 
 #ifdef __cplusplus
 }

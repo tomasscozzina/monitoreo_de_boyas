@@ -78,19 +78,10 @@ public:
     }
 
     void spiTransfer(uint8_t *out, size_t len, uint8_t *in) override {
-		uint8_t txBuf[64] = {0};
-		uint8_t rxBuf[64] = {0};
-		size_t chunk = (len > 64) ? 64 : len;
-		for (size_t i = 0; i < chunk; i++) {
-			txBuf[i] = out[i];
-		}
-		HAL_SPI_TransmitReceive(&hspi1, txBuf, rxBuf, (uint16_t)chunk, HAL_MAX_DELAY);
-		for (size_t i = 0; i < chunk; i++) {
-			in[i] = rxBuf[i];
-		}
-//        if (len == 0) return;
-//            // Usa los punteros originales. La HAL de STM32 maneja esto perfectamente.
-//        HAL_SPI_TransmitReceive(&hspi1, out, in, (uint16_t)len, HAL_MAX_DELAY);
+        if (len == 0 || out == NULL || in == NULL) return;
+
+        // La HAL accede directamente a la memoria de RadioLib
+        HAL_SPI_TransmitReceive(&hspi1, out, in, (uint16_t)len, HAL_MAX_DELAY);
     }
 
     void delay(unsigned long ms) override {
@@ -98,12 +89,10 @@ public:
     }
 
     void delayMicroseconds(unsigned long us) override {
-//        uint32_t start = micros();
-//        while (micros() - start < us);
 
-        uint32_t count = us * (SystemCoreClock / 1000000U) / 4;
+    	uint32_t count = us * (SystemCoreClock / 1000000U) / 4;
         for (volatile uint32_t i = 0; i < count; i++) {
-        	__asm__("nop"); 	// Esto se agrega para que al optimizar la compilacion, el compilador no borre este bucle vacío
+        	__asm__("nop"); 	// TOMI: Esto se agrega para que al optimizar la compilacion, el compilador no borre este bucle vacío
         }
     }
 
@@ -177,6 +166,11 @@ extern "C" {
 		return HAL_OK;
 	}
 
+    void lorawan_g0_irq(void) {
+        if (_g0_cb)
+        	_g0_cb();	// Función de Callback
+    }
+
 	/*
 	 * %%%%%%%%%%%% INICIO DE API PÚBLICA %%%%%%%%%%%%%
 	*/
@@ -184,24 +178,15 @@ extern "C" {
 	void lorawan_init(void) {
     	DPRINT("INICIANDO RADIO\r\n");
 
-    	HAL_GPIO_WritePin(RFM95W_RST_GPIO_Port, RFM95W_RST_Pin, GPIO_PIN_RESET);
-		HAL_Delay(10);
-		HAL_GPIO_WritePin(RFM95W_RST_GPIO_Port, RFM95W_RST_Pin, GPIO_PIN_SET);
-		HAL_Delay(10);
-
         int16_t state = radio.begin();
     	while (state != RADIOLIB_ERR_NONE){
     		DPRINT("LA INICIALIZACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
     		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
     		HAL_Delay(10000);
-    		HAL_GPIO_WritePin(RFM95W_RST_GPIO_Port, RFM95W_RST_Pin, GPIO_PIN_RESET);
-			HAL_Delay(10);
-			HAL_GPIO_WritePin(RFM95W_RST_GPIO_Port, RFM95W_RST_Pin, GPIO_PIN_SET);
-			HAL_Delay(10);
+
     		state = radio.begin();
     	}
     	DPRINT("INICIALIZACIÓN EXISTOSA\r\n");
-    	DPRINT("VERSION DEL CHIP: 0x%02X\r\n", radio.getChipVersion());
     }
 
     void lorawan_configure(const lorawan_credentials_t *cred) {
@@ -209,27 +194,16 @@ extern "C" {
 
         uint64_t joinEUI = bytes_to_u64(cred->joinEUI);
         uint64_t devEUI = bytes_to_u64(cred->devEUI);
-        node.beginOTAA(joinEUI, devEUI, nullptr, const_cast<uint8_t *>(cred->appKey));
 
-        DPRINT("CONFIGURACIÓN EXITOSA\r\n");
-    }
-
-    void lorawan_join(void) {
-    	DPRINT("ACTIVANDO END DEVICE VÍA OTAA \r\n");
-
-    	int16_t state = node.activateOTAA();
-        while((state != RADIOLIB_LORAWAN_NEW_SESSION) && (state != RADIOLIB_LORAWAN_SESSION_RESTORED)){
-    		DPRINT("LA ACTIVACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+        int16_t state = node.beginOTAA(joinEUI, devEUI, nullptr, const_cast<uint8_t *>(cred->appKey));
+    	while (state != RADIOLIB_ERR_NONE){
+    		DPRINT("LA CONFIGURACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
     		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
     		HAL_Delay(10000);
-    		state = node.activateOTAA();
-        }
 
-        // Configuración para Argentina (AU915)
-		node.setDutyCycle(false);
-		node.setDwellTime(false);
-
-        DPRINT("ACTIVACIÓN EXITOSA \r\n");
+    		state = node.beginOTAA(joinEUI, devEUI, nullptr, const_cast<uint8_t *>(cred->appKey));
+    	}
+        DPRINT("CONFIGURACIÓN EXITOSA\r\n");
     }
 
     void lorawan_session_restore(void) {
@@ -242,6 +216,22 @@ extern "C" {
         else{
         	DPRINT("NO SE HA RESTAURADO EL BUFFER NONCE DE LA SESIÓN ANTERIOR, POR INEXISTENCIA O DATO CORROMPIDO \r\n");
         }
+    }
+
+    void lorawan_join(void) {
+    	DPRINT("ACTIVANDO END DEVICE VÍA OTAA \r\n");
+
+    	node.setADR(false);		// TOMI: Prueba apagando el ADR para test de alcance
+
+    	int16_t state = node.activateOTAA();
+        while((state != RADIOLIB_LORAWAN_NEW_SESSION) && (state != RADIOLIB_LORAWAN_SESSION_RESTORED)){
+    		DPRINT("LA ACTIVACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+    		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
+    		HAL_Delay(10000);
+    		state = node.activateOTAA();
+        }
+        node.setDatarate(0);	// TOMI: Prueba fijando DR0 (SF12) para prueba de alcance
+        DPRINT("ACTIVACIÓN EXITOSA \r\n");
     }
 
     void lorawan_session_save(void) {
@@ -266,14 +256,14 @@ extern "C" {
         int16_t state = 0;
         state = node.sendReceive((const uint8_t *) uplink->payload, uplink->len, uplink->port, downlink->data, &downlink_len, uplink->confirmed, &evUp, &evDown);
 
-        DPRINT("UPLINK ENVIADO    - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d;  PORT: %d; CONFIRMING: %s; POWER: %d \r\n",
+        DPRINT("UPLINK ENVIADO    - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMED:  %s; POWER: %d \r\n",
         		uplink->len,
 				(char*)uplink->payload,
 				evUp.fCnt - 1,	// se le resta 1 porque sendRecieve suma 1 al contador fCnt luego de la transmisión
 				(unsigned long)(evUp.freq * 1000000UL),
 				evUp.datarate,
 				evUp.fPort,
-				(evUp.confirming ? "Y" : "N"),
+				(evUp.confirmed ? "Y" : "N"),
 				evUp.power);
 
         if (state == RADIOLIB_ERR_NONE || state == 1 || state == 2) {
@@ -283,14 +273,14 @@ extern "C" {
 				downlink->window = (state > 0) ? state : 0;
 				downlink->available = true;
 
-		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMED:  %s; RSSI:  %d; WINDOW: %d \r\n",
+		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMING: %s; RSSI:  %d; WINDOW: %d \r\n",
 		        		downlink->len,
 						(char*)downlink->data,
 						evDown.fCnt,
 						(unsigned long)(evDown.freq * 1000000UL),
 						evDown.datarate,
 						downlink->port,
-						(evDown.confirmed ? "Y" : "N"),
+						(evDown.confirming ? "Y" : "N"),
 						evDown.power,
 						downlink->window);
 			}
@@ -302,12 +292,6 @@ extern "C" {
 			DPRINT("LA TRANSMISIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
 		}
     }
-
-    void lorawan_g0_irq(void) {
-        if (_g0_cb)
-        	_g0_cb();
-    }
-
 	/*
 	 * %%%%%%%%%%%% FIN DE API PÚBLICA %%%%%%%%%%%%%
 	*/
