@@ -986,7 +986,7 @@ class LoRaWANNode {
       500 is the **maximum** value, but it is not a good idea to go anywhere near that.
       If you have to go above 50 you probably have a bug somewhere. Check your device timing.
     */
-    RadioLibTime_t scanGuard = 200;		// TOMI: El valor original es 10, lo tuve que subir para que funciones con SF12 y SF11
+    RadioLibTime_t scanGuard = 300;		// TOMI: El valor original es 10, lo tuve que subir para que funciones con SF12 y SF11
 
 #if !RADIOLIB_GODMODE
   protected:

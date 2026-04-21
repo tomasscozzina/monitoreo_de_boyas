@@ -8,8 +8,13 @@ extern "C" {
 #include "stm32l4xx_hal.h"
 #include "config.h"
 
+#define RFM95W_SCK_Pin GPIO_PIN_1
+#define RFM95W_SCK_GPIO_Port GPIOA
 #define VCP_TX_Pin GPIO_PIN_2
 #define VCP_TX_GPIO_Port GPIOA
+#define SW1_Pin GPIO_PIN_3
+#define SW1_GPIO_Port GPIOA
+#define SW1_EXTI_IRQn EXTI3_IRQn
 #define RFM95W_RST_Pin GPIO_PIN_8
 #define RFM95W_RST_GPIO_Port GPIOA
 #define RFM95W_CS_Pin GPIO_PIN_11
@@ -23,8 +28,8 @@ extern "C" {
 #define SWCLK_GPIO_Port GPIOA
 #define VCP_RX_Pin GPIO_PIN_15
 #define VCP_RX_GPIO_Port GPIOA
-#define RFM95W_SCK_Pin GPIO_PIN_3
-#define RFM95W_SCK_GPIO_Port GPIOB
+#define LD3_Pin GPIO_PIN_3
+#define LD3_GPIO_Port GPIOB
 #define RFM95W_MISO_Pin GPIO_PIN_4
 #define RFM95W_MISO_GPIO_Port GPIOB
 #define RFM95W_MOSI_Pin GPIO_PIN_5

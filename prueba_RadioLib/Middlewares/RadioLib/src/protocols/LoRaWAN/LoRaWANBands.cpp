@@ -299,7 +299,7 @@ const LoRaWANBand_t AU915 = {
       .freqStep = 2000,
       .drMin = 0,
       .drMax = 5,
-      .drJoinRequest = 0	// TOMI: es 2 originalmente
+      .drJoinRequest = 2	// TOMI: es 2 originalmente
     },
     {	// en la especificación de parámetros regionales, los espectros azules
       .numChannels = 8,

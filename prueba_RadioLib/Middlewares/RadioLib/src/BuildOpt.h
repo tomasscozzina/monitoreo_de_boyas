@@ -479,13 +479,8 @@
   #define RADIOLIB_EXCLUDE_STM32WLX (1)
 #endif
 
-// if verbose assert is enabled, enable basic debug too
-#if RADIOLIB_VERBOSE_ASSERT
-  #define RADIOLIB_DEBUG  (1)
-#endif
-
 // set the global debug mode flag
-#if RADIOLIB_DEBUG_BASIC || RADIOLIB_DEBUG_PROTOCOL || RADIOLIB_DEBUG_SPI
+#if RADIOLIB_DEBUG_BASIC || RADIOLIB_DEBUG_PROTOCOL || RADIOLIB_DEBUG_SPI || RADIOLIB_VERBOSE_ASSERT
   #define RADIOLIB_DEBUG  (1)
 #else
   #define RADIOLIB_DEBUG  (0)

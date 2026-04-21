@@ -907,40 +907,40 @@ int16_t LoRaWANNode::activateOTAA(LoRaWANJoinEvent_t *joinEvent) {
     return(RADIOLIB_ERR_INVALID_MODE);
   }
 
-  // check if there is an active session
+  // check if there is an active session 	// TOMI: en el Join NO entra acá
   if(this->isActivated()) {
     // already activated, don't do anything
     return(RADIOLIB_ERR_NONE);
   }
 
-  // check if there is a restored session
+  // check if there is a restored session 	// TOMI: en el Join NO entra acá
   if(this->sessionStatus == RADIOLIB_LORAWAN_SESSION_PENDING) {
     // session restored but not yet activated - do so now
     this->sessionStatus = RADIOLIB_LORAWAN_SESSION_ACTIVE;
     return(RADIOLIB_LORAWAN_SESSION_RESTORED);
   }
 
-  // if there is no session, reset everything to defaults
+  // if there is no session, reset everything to defaults	// TOMI: en el Join SI entra acá
   if(this->sessionStatus == RADIOLIB_LORAWAN_SESSION_NONE) {
     this->createSession();
   }
 
   Module *mod = this->phyLayer->getMod();
   RadioLibTime_t tNow = mod->hal->millis();
-  // if scheduled uplink time is in the past, reschedule to now
+  // if scheduled uplink time is in the past, reschedule to now		// TOMI: en el Join SI entra acá
   if(this->tUplink < tNow) {
     this->tUplink = tNow;
   }
 
   // if dutycycle is enabled and the time since last uplink + interval has not elapsed, return an error
-  if(this->dutyCycleEnabled) {
+  if(this->dutyCycleEnabled) {		// TOMI: en el Join NO entra acá
     if(this->tUplinkEnd + (RadioLibTime_t)dutyCycleInterval(this->dutyCycle, this->lastToA) > this->tUplink) {
       return(RADIOLIB_ERR_UPLINK_UNAVAILABLE);
     }
   }
 
   // starting a new session, so make sure to update event fields already
-  if(joinEvent) {
+  if(joinEvent) {					// TOMI: en el Join NO entra acá
     joinEvent->newSession = true;
     joinEvent->devNonce = this->devNonce;
     joinEvent->joinNonce = this->joinNonce;

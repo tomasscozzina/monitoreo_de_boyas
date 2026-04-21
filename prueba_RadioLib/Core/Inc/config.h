@@ -29,5 +29,6 @@ void system_init(void);
 void lorawan_setup(void);
 void Error_Handler(void);
 void SystemClock_Config(void);
+bool get_sw1PressEv(void);
 
 #endif

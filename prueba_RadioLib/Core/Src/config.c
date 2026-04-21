@@ -1,4 +1,3 @@
-
 #include "config.h"
 
 #include "stm32l4xx_hal.h"
@@ -12,6 +11,8 @@ const lorawan_credentials_t LORA_CREDENTIALS = {
     .appKey  = {0xF6, 0x4E, 0xC8, 0x24, 0x2B, 0x0C, 0x12, 0x52,
                 0x68, 0x37, 0x7C, 0x81, 0x24, 0x27, 0x4C, 0xEA}
 };
+
+bool sw1_flag = false;
 
 void system_init(void){
 	HAL_Init();
@@ -90,4 +91,19 @@ void Error_Handler(void){
 int __io_putchar(int ch){
   HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
   return ch;
+}
+
+// Redefinición de callback weak
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	if(GPIO_Pin == SW1_Pin){
+		sw1_flag = true;
+	}
+}
+
+bool get_sw1PressEv(void){
+	if(sw1_flag){
+		sw1_flag = false;
+		return true;
+	}
+	return false;
 }

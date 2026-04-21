@@ -221,8 +221,6 @@ extern "C" {
     void lorawan_join(void) {
     	DPRINT("ACTIVANDO END DEVICE VÍA OTAA \r\n");
 
-    	node.setADR(false);		// TOMI: Prueba apagando el ADR para test de alcance
-
     	int16_t state = node.activateOTAA();
         while((state != RADIOLIB_LORAWAN_NEW_SESSION) && (state != RADIOLIB_LORAWAN_SESSION_RESTORED)){
     		DPRINT("LA ACTIVACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
@@ -230,7 +228,6 @@ extern "C" {
     		HAL_Delay(10000);
     		state = node.activateOTAA();
         }
-        node.setDatarate(0);	// TOMI: Prueba fijando DR0 (SF12) para prueba de alcance
         DPRINT("ACTIVACIÓN EXITOSA \r\n");
     }
 
@@ -273,7 +270,7 @@ extern "C" {
 				downlink->window = (state > 0) ? state : 0;
 				downlink->available = true;
 
-		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMING: %s; RSSI:  %d; WINDOW: %d \r\n",
+		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMING: %s; RSSI: %d; SNR: %d; WINDOW: %d \r\n",
 		        		downlink->len,
 						(char*)downlink->data,
 						evDown.fCnt,
@@ -281,17 +278,35 @@ extern "C" {
 						evDown.datarate,
 						downlink->port,
 						(evDown.confirming ? "Y" : "N"),
-						evDown.power,
+						(int8_t)radio.getRSSI(),
+						(int8_t)radio.getSNR(),
 						downlink->window);
 			}
 			else {
-				DPRINT("NO SE RECIBIÓ DOWLINK \r\n");
+				DPRINT("NO SE RECIBIÓ DOWLINK. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
 			}
 		}
         else {
-			DPRINT("LA TRANSMISIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+			DPRINT("LA COMUNICACIÓN (TX O RX) FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
 		}
     }
+
+    void lorawan_setADR(bool enable){
+    	node.setADR(enable);
+    }
+
+    void lorawan_setDataRate(uint8_t dr){
+    	node.setDatarate(dr);
+    }
+
+    int8_t lorawan_getSNR(){
+    	return ((int8_t)radio.getSNR());
+    }
+
+    int8_t lorawan_getRSSI(){
+    	return ((int8_t)radio.getRSSI());
+    }
+
 	/*
 	 * %%%%%%%%%%%% FIN DE API PÚBLICA %%%%%%%%%%%%%
 	*/

@@ -41,6 +41,10 @@ extern "C"
     void lorawan_join(void);
     void lorawan_session_save(void);
     void lorawan_send(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
+    void lorawan_setADR(bool enable);
+    void lorawan_setDataRate(uint8_t dr);
+    int8_t lorawan_getSNR();
+    int8_t lorawan_getRSSI();
 
 #ifdef __cplusplus
 }
