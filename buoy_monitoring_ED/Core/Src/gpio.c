@@ -86,7 +86,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : RFM95W_G0_Pin */
   GPIO_InitStruct.Pin = RFM95W_G0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;		// TOMI: Antes era GPIO_NOPULL, lo cambíe para desconectar el LoRa. Verificar luego si funciona igual. Debería
   HAL_GPIO_Init(RFM95W_G0_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD3_Pin */

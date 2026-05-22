@@ -1,79 +1,80 @@
 #include "main.h"
-#include "string.h"
+#include "gps.h"
 
-#define numTx_DR0 10
-#define numTx_DR2 11
+int main(void)
+{
+    system_init();
 
-int main(void){
+    while (1)
+    {
+        if (get_sw1PressEv())
+        {
+            DPRINT("INICIANDO\r\n");
+            GPS_Status ret = GPS_WakeUp();
 
-	system_init();
-	lorawan_setup();
+            switch(ret){
+            	case GPS_OK:
+            		DPRINT("GPS_OK\r\n");
+            	break;
+            	case GPS_ERR_TIMEOUT:
+            		DPRINT("ERROR: GPS_ERR_TIMEOUT\r\n");
+            	continue;
+            	case GPS_ERR_CHECKSUM:
+            	    DPRINT("ERROR: GPS_ERR_CHECKSUM\r\n");
+            	continue;
+            	case GPS_ERR_BADHEADER:
+            	    DPRINT("ERROR: GPS_ERR_BADHEADER\r\n");
+				continue;
+            	case GPS_ERR_NO_FIX:
+					DPRINT("ERROR: GPS_ERR_NO_FIX\r\n");
+				continue;
+            	case GPS_ERR_ANTENNA:
+        			DPRINT("ERROR: GPS_ERR_ANTENNA\r\n");
+        		continue;
+            }
 
-	char texto_payload[20];
-	lorawan_setADR(false);	// TOMI: Apago el ADR para la prueba de alcance
+            ret = GPS_HasValidFix();
+            while(ret != GPS_OK) {
+                switch(ret){
+                	case GPS_OK:
+                        DPRINT("GPS_OK\r\n");
+                    break;
+                	case GPS_ERR_TIMEOUT:
+                		DPRINT("ERROR: GPS_ERR_TIMEOUT\r\n");
+                	break;
+                	case GPS_ERR_CHECKSUM:
+                	    DPRINT("ERROR: GPS_ERR_CHECKSUM\r\n");
+                	break;
+                	case GPS_ERR_BADHEADER:
+                	    DPRINT("ERROR: GPS_ERR_BADHEADER\r\n");
+                	break;
+                	case GPS_ERR_NO_FIX:
+                		DPRINT("ERROR: GPS_ERR_NO_FIX\r\n");
+                	break;
+                	case GPS_ERR_ANTENNA:
+            			DPRINT("ERROR: GPS_ERR_ANTENNA\r\n");
+            		break;
+                }
+                HAL_Delay(1000);
+                ret = GPS_HasValidFix();
+            }
+            DPRINT("FIX_OK\r\n");
 
-	while (1){
+            int32_t lat, lon;
+            GPS_UTCTime utc;
 
-		if(get_sw1PressEv()){
+            GPS_GetLatitude(&lat);
+            GPS_GetLongitude(&lon);
+            GPS_GetUTCTime(&utc);
 
-			for(int i = 0; i < 6; i++){
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-				HAL_Delay(100);
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-				HAL_Delay(100);
-			}
+            DPRINT("LATITUD  : %ld (x1e-7 deg)\r\n", lat);
+            DPRINT("LONGITUD : %ld (x1e-7 deg)\r\n", lon);
+            DPRINT("FECHA    : %04d-%02d-%02d\r\n", utc.year, utc.month, utc.day);
+            DPRINT("HORA UTC : %02d:%02d:%02d\r\n", utc.hour, utc.min, utc.sec);
 
-			DPRINT("INICIANDO TRANSMICIÓN CON DR0 (SF12) \r\n\n");
-			lorawan_setDataRate(0);		// Seteo DR0 (SF12) para las primeras 20 Tx
-			for(int i = 0; i < numTx_DR0; i++){
-				lorawan_downlink_t downlink;
-				lorawan_uplink_t uplink;
-
-				int len = snprintf(texto_payload, sizeof(texto_payload), "%d,%d,%d", i,
-						lorawan_getRSSI(),
-						lorawan_getSNR());
-
-				uplink.payload = texto_payload;
-				uplink.len = (uint8_t)len;
-				uplink.port = PERIODIC_TRANSMISSION_PORT;
-				uplink.confirmed = false;
-
-				lorawan_send(&uplink, &downlink);
-
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-				HAL_Delay(500);
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-
-				HAL_Delay(4500);	// aproximadamente, 5 segundos en total entre Tx
-			}
-
-			DPRINT("INICIANDO TRANSMICIÓN CON DR2 (SF10) \r\n\n");
-			lorawan_setDataRate(2);		// Seteo DR2 (SF10) para las segundas 20 Tx
-			for(int i = 0; i < numTx_DR2; i++){
-				lorawan_downlink_t downlink;
-				lorawan_uplink_t uplink;
-
-				int len = snprintf(texto_payload, sizeof(texto_payload), "%d,%d,%d", i,
-										lorawan_getRSSI(),
-										lorawan_getSNR());
-
-				uplink.payload = texto_payload;
-				uplink.len = (uint8_t)len;
-				uplink.port = PERIODIC_TRANSMISSION_PORT;
-				uplink.confirmed = false;
-
-				lorawan_send(&uplink, &downlink);
-
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-				HAL_Delay(500);
-				HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-
-				HAL_Delay(4500);	// aproximadamente, 5 segundos en total entre Tx
-			}
-
-			DPRINT("TRANSMISIONES FINALIZADAS \r\n\n");
-			get_sw1PressEv();	// Esto para borrar la flag por pulsados accidentales durante las Tx
-		}
-
-	}
+            GPS_Sleep();
+            DPRINT("MEDICIONES FINALIZADAS\r\n");
+            DPRINT("GPS EN MODO BACKUP\r\n\n");
+        }
+    }
 }

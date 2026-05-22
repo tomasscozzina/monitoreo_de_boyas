@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */	// TOMI: Este archivo es solo para la inicialización, no tiene métodos
 /**
   ******************************************************************************
   * @file    usart.c
@@ -71,7 +71,7 @@ void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -80,7 +80,7 @@ void MX_USART2_UART_Init(void)
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
+  if (HAL_UART_Init(&huart2) != HAL_OK)		// Esta función llama internamente a HAL_UART_MspInit (función que sigue)
   {
     Error_Handler();
   }

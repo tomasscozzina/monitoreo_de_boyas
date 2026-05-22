@@ -19,6 +19,7 @@ void system_init(void){
 	SystemClock_Config();
 	MX_GPIO_Init();
 	MX_SPI1_Init();
+	MX_USART1_UART_Init();
 	MX_USART2_UART_Init();
 	setvbuf(stdout, NULL, _IONBF, 0);
 }

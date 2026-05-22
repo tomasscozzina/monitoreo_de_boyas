@@ -12,7 +12,7 @@
 	// agregar acá más define que se deben habilitar en DEBUG
 #endif
 
-#ifdef COMMENTS
+#ifdef COMMENTS	 // el soporte para imprimir números flotantes está desactivado para ahorrar flash
 	#define DPRINT(fmt, ...) \
 		do { \
 			uint32_t tick = HAL_GetTick(); \
