@@ -4,6 +4,9 @@
 #include "spi.h"
 #include "usart.h"
 #include "gpio.h"
+#include "adxl345.h"
+
+#define ANTIREBOTE 300
 
 const lorawan_credentials_t LORA_CREDENTIALS = {
     .joinEUI = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
@@ -21,6 +24,7 @@ void system_init(void){
 	MX_SPI1_Init();
 	MX_USART1_UART_Init();
 	MX_USART2_UART_Init();
+	MX_I2C1_Init();
 	setvbuf(stdout, NULL, _IONBF, 0);
 }
 
@@ -96,16 +100,32 @@ int __io_putchar(int ch){
 }
 
 // Redefinición de callback weak
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if(GPIO_Pin == SW1_Pin){
-		sw1_flag = true;
-	}
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == SW1_Pin) {
+        sw1_flag = true;
+    } else if (GPIO_Pin == ADXL345_INT1_Pin) {
+        ADXL345_NotifyImpact();
+    } else if (GPIO_Pin == ADXL345_INT2_Pin) {
+        ADXL345_NotifyDataReady();
+    }
 }
 
-bool get_sw1PressEv(void){
-	if(sw1_flag){
-		sw1_flag = false;
-		return true;
-	}
-	return false;
+bool en_espera_antirebote = false;
+uint32_t start = 0;
+bool get_sw1PressEv(void){		// TOMI: Ahora es no bloqueante
+    if (en_espera_antirebote == true) {
+        if (HAL_GetTick() - start >= ANTIREBOTE) {
+            en_espera_antirebote = false;
+        }
+    }
+    if (sw1_flag == true) {
+        sw1_flag = false;
+
+        if (en_espera_antirebote == false) {
+            start = HAL_GetTick();
+            en_espera_antirebote = true;
+            return true;
+        }
+    }
+    return false;
 }
