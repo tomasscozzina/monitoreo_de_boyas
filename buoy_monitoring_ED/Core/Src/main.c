@@ -1,76 +1,51 @@
-/**
- ******************************************************************************
- * @file    main.c
- * @brief   Main de prueba para el ADXL345.
- *
- * Prueba las dos funciones del acelerómetro:
- *   - Al presionar SW1: lee la inclinación e imprime los resultados.
- *   - Si INT1 dispara (impacto): imprime un aviso de emergencia.
- ******************************************************************************
- */
+// Código para el TEST de precisión
 
 #include "main.h"
-#include "adxl345.h"
-#include <math.h>
+#include "ina219.h"
 
 int main(void) {
     system_init();
     DPRINT("Sistema iniciado\r\n");
 
-    /* Inicializar el acelerómetro */
-    ADXL345_Status ret = ADXL345_Init();
-    if (ret != ADXL345_OK) {
-        DPRINT("ERROR: ADXL345_Init() = %d\r\n", ret);
+    /* Inicializar los 3 módulos INA219 */
+    INA219_Status ret = INA219_InitAll();
+    if (ret != INA219_OK) {
+        DPRINT("ERROR: INA219_InitAll() = %d\r\n", ret);
         while (1) {}
     }
+    DPRINT("INA219: 3 modulos inicializados OK\r\n");
+    DPRINT("Presiona SW1 para obtener una medición\r\n");
 
-    DPRINT("Presiona SW1 para leer inclinacion\r\n");
+    int32_t voltage_mV = 0;
+    int32_t current_mA = 0;
+    INA219_Channel ch = INA219_CH1;
 
     while (1) {
 
-        // Prueba de inclinación, disparada por SW1
-        if (get_sw1PressEv()) {
-            DPRINT("Leyendo inclinacion...\r\n");
+        if (get_sw1PressEv())
+        {
+        	ret = INA219_GetVoltage(ch, &voltage_mV);
+			if (ret != INA219_OK) {
+				DPRINT("ERROR: INA219_GetVoltage(CH%d) = %d\r\n", (int)ch, ret);
+				HAL_Delay(500);
+				continue;
+			}
 
-            ADXL345_TiltData tilt;
-            ret = ADXL345_ReadTilt(&tilt);
+			ret = INA219_GetCurrent(ch, &current_mA);
+			if (ret != INA219_OK) {
+				DPRINT("ERROR: INA219_GetCurrent(CH%d) = %d\r\n", (int)ch, ret);
+				HAL_Delay(500);
+				continue;
+			}
 
-            if (ret == ADXL345_OK) {
-                // TOMI: DPRINT no soporta %f. Se imprimen partes entera y decimal por separado.
-                int total_i = (int)tilt.tilt_deg;
-                int total_d = (int)(fabsf(tilt.tilt_deg - total_i) * 100);
-                int xz_i    = (int)tilt.tilt_xz_deg;
-                int xz_d    = (int)(fabsf(tilt.tilt_xz_deg - xz_i) * 100);
-                int yz_i    = (int)tilt.tilt_yz_deg;
-                int yz_d    = (int)(fabsf(tilt.tilt_yz_deg - yz_i) * 100);
-
-                DPRINT("Inclinacion total: %d.%02d grados\r\n", total_i, total_d);
-                DPRINT("Plano XZ (Y=0):    %d.%02d grados\r\n", xz_i, xz_d);
-                DPRINT("Plano YZ (X=0):    %d.%02d grados\r\n", yz_i, yz_d);
-            }
-            // Codigo para el TEST
-//			if (ret == ADXL345_OK) {
-//				float xz = fabsf(tilt.tilt_xz_deg);
-//				int xz_i = (int)xz;
-//				int xz_d = (int)((xz - xz_i) * 100);
-//				DPRINT("Plano XZ (Y=0): %d.%02d grados\r\n", xz_i, xz_d);
+			DPRINT("CH%d | %ld mV | %ld mA\r\n", (int)ch, voltage_mV, current_mA);
+//
+//    		ret = INA219_DetectAndMeasure(ch, &current_mA,3100);
+//    		if (ret != INA219_OK) {
+//				DPRINT("ERROR: INA219_DetectAndMeasure(CH%d) = %d\r\n", (int)ch, ret);
+//				continue;
 //			}
-            else {
-                DPRINT("ERROR: ADXL345_ReadTilt() = %d\r\n", ret);
-            }
-        }
-
-        // Prueba de detección de impacto, disparada por INT1
-        if (ADXL345_GetAndClearImpactFlag()) {
-
-        	DPRINT("*** IMPACTO DETECTADO ***\r\n");
-        	HAL_Delay(500);		// Espero 500 ms como antirebote
-
-        	// TOMI: Siempre llamar a esta función si se detecta interrupción por Activity, ya que limpia la bandera
-            ret = ADXL345_HandleImpact();
-            if (ret != ADXL345_OK) {
-                DPRINT("ERROR: ADXL345_GetAndClearImpactFlag() = %d\r\n", ret);
-            }
+//    		DPRINT("CH%d | %ld mA\r\n", (int)ch, current_mA);
         }
     }
 }
