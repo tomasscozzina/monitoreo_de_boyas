@@ -53,7 +53,7 @@ void MX_SPI1_Init(void)
   hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
   if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler();	// Nunca se va a ejecutar esto
   }
   /* USER CODE BEGIN SPI1_Init 2 */
 

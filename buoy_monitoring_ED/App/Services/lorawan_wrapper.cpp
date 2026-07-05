@@ -1,6 +1,7 @@
 #include "lorawan_wrapper.h"
+#include "lorawan_credentials.h"
 #include "main.h"
-#include <RadioLib.h>
+#include "RadioLib.h"
 
 /* ── Identificadores de pines ── */
 #define PIN_ID_CS 		1
@@ -19,6 +20,7 @@
 
 extern SPI_HandleTypeDef hspi1;
 
+// Captura el evento de G0
 static void (*_g0_cb)(void) = nullptr;
 
 class STM32Hal : public RadioLibHal {
@@ -51,6 +53,7 @@ public:
         }
     }
 
+    // Captura el estado de G0
     uint32_t digitalRead(uint32_t pin) override {
         if (pin == PIN_ID_G0) {
             return HAL_GPIO_ReadPin(RFM95W_G0_GPIO_Port, RFM95W_G0_Pin);
@@ -112,13 +115,6 @@ static LoRaWANNode node(&radio, &AU915, 2);
 
 extern "C" {
 
-	static uint64_t bytes_to_u64(const uint8_t *b) {
-		return ((uint64_t)b[0] << 56) | ((uint64_t)b[1] << 48) |
-			   ((uint64_t)b[2] << 40) | ((uint64_t)b[3] << 32) |
-			   ((uint64_t)b[4] << 24) | ((uint64_t)b[5] << 16) |
-			   ((uint64_t)b[6] << 8)  | (uint64_t)b[7];
-	}
-
 	static bool flash_restore(LoRaWANNode *node) {
 		const uint8_t *base = (const uint8_t *)NONCE_FLASH_ADDR;
 
@@ -166,14 +162,17 @@ extern "C" {
 		return HAL_OK;
 	}
 
-    void lorawan_g0_irq(void) {
-        if (_g0_cb)
-        	_g0_cb();	// Función de Callback
-    }
-
 	/*
 	 * %%%%%%%%%%%% INICIO DE API PÚBLICA %%%%%%%%%%%%%
 	*/
+
+    void lorawan_setup(void){
+    	lorawan_init();
+    	lorawan_configure();
+    	lorawan_session_restore();
+    	lorawan_join();
+    	lorawan_session_save();
+    }
 
 	void lorawan_init(void) {
     	DPRINT("INICIANDO RADIO\r\n");
@@ -189,19 +188,18 @@ extern "C" {
     	DPRINT("INICIALIZACIÓN EXISTOSA\r\n");
     }
 
-    void lorawan_configure(const lorawan_credentials_t *cred) {
+    void lorawan_configure(void) {
     	DPRINT("CONFIGURANDO CREDENCIALES\r\n");
 
-        uint64_t joinEUI = bytes_to_u64(cred->joinEUI);
-        uint64_t devEUI = bytes_to_u64(cred->devEUI);
+    	static const uint8_t appKey[16] = LORAWAN_APP_KEY;
 
-        int16_t state = node.beginOTAA(joinEUI, devEUI, nullptr, const_cast<uint8_t *>(cred->appKey));
+        int16_t state = node.beginOTAA(LORAWAN_JOIN_EUI, LORAWAN_DEVICE_EUI, nullptr, appKey);
     	while (state != RADIOLIB_ERR_NONE){
     		DPRINT("LA CONFIGURACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
     		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
     		HAL_Delay(10000);
 
-    		state = node.beginOTAA(joinEUI, devEUI, nullptr, const_cast<uint8_t *>(cred->appKey));
+    		state = node.beginOTAA(LORAWAN_JOIN_EUI, LORAWAN_DEVICE_EUI, nullptr, appKey);
     	}
         DPRINT("CONFIGURACIÓN EXITOSA\r\n");
     }
@@ -305,6 +303,11 @@ extern "C" {
 
     int8_t lorawan_getRSSI(){
     	return ((int8_t)radio.getRSSI());
+    }
+
+    void RFM95W_notifyG0(void) {
+        if (_g0_cb)
+        	_g0_cb();	// Función de Callback
     }
 
 	/*

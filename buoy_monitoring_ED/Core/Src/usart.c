@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */	// TOMI: Este archivo es solo para la inicialización, no tiene métodos
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file    usart.c
@@ -24,11 +24,10 @@
 
 /* USER CODE END 0 */
 
-UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart1;	// Módulo GPS
+UART_HandleTypeDef huart2;	// Puerto SERIE
 
 /* USART1 init function */
-
 void MX_USART1_UART_Init(void)
 {
 
@@ -58,8 +57,8 @@ void MX_USART1_UART_Init(void)
   /* USER CODE END USART1_Init 2 */
 
 }
-/* USART2 init function */
 
+/* USART2 init function */
 void MX_USART2_UART_Init(void)
 {
 
@@ -125,9 +124,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    /* USART1 interrupt Init */
-    HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(USART1_IRQn);
   /* USER CODE BEGIN USART1_MspInit 1 */
 
   /* USER CODE END USART1_MspInit 1 */

@@ -86,7 +86,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin : RFM95W_G0_Pin */
   GPIO_InitStruct.Pin = RFM95W_G0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;		// TOMI: Antes era GPIO_NOPULL, lo cambíe para desconectar el LoRa. Verificar luego si funciona igual. Debería
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(RFM95W_G0_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD3_Pin */
@@ -102,16 +102,19 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
+  /* ADXL345_INT2_Pin: Data Ready */
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
-//  HAL_NVIC_EnableIRQ(EXTI0_IRQn);		// TOMI: La dejo deshabilitada para luego habilitarla cuando la necesito
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
+  /* ADXL345_INT2_Pin: Activity */
   HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
+  /* SW1: Press */
   HAL_NVIC_SetPriority(EXTI3_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
+  /* RFM95W: G0 */
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 

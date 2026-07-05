@@ -13,13 +13,6 @@ extern "C"
 {
 #endif
 
-    typedef struct
-    {
-        uint8_t joinEUI[8];
-        uint8_t devEUI[8];
-        uint8_t appKey[16];
-    } lorawan_credentials_t;
-
     typedef struct {
         uint8_t data[256];
         uint8_t len;
@@ -35,8 +28,9 @@ extern "C"
         bool confirmed;         // true = Confirmed, false = Unconfirmed
     } lorawan_uplink_t;
 
+    void lorawan_setup(void);
     void lorawan_init(void);
-    void lorawan_configure(const lorawan_credentials_t *cred);
+    void lorawan_configure(void);
     void lorawan_session_restore(void);
     void lorawan_join(void);
     void lorawan_session_save(void);
@@ -45,6 +39,7 @@ extern "C"
     void lorawan_setDataRate(uint8_t dr);
     int8_t lorawan_getSNR();
     int8_t lorawan_getRSSI();
+    void RFM95W_notifyG0(void);
 
 #ifdef __cplusplus
 }

@@ -1,51 +1,60 @@
-// Código para el TEST de precisión
+/******************************************************************************
+ * @file    main.c
+ * @author  Tomás Agustín Scozzina
+ * @date    23 jun 2026
+ * @brief   Código de inicio
+ ******************************************************************************/
 
 #include "main.h"
-#include "ina219.h"
+#include "spi.h"
+#include "usart.h"
+#include "gpio.h"
+#include "i2c.h"
+#include "rtc.h"
+#include "buoy_app.h"
+#include "system_clock.h"
+
+uint8_t is_boot_retry = 0;
 
 int main(void) {
-    system_init();
-    DPRINT("Sistema iniciado\r\n");
+	HAL_Init();
+	CheckReset_Flag();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_SPI1_Init();
+    MX_USART1_UART_Init();
+    MX_USART2_UART_Init();
+    MX_I2C1_Init();
+    MX_RTC_Init();
 
-    /* Inicializar los 3 módulos INA219 */
-    INA219_Status ret = INA219_InitAll();
-    if (ret != INA219_OK) {
-        DPRINT("ERROR: INA219_InitAll() = %d\r\n", ret);
-        while (1) {}
-    }
-    DPRINT("INA219: 3 modulos inicializados OK\r\n");
-    DPRINT("Presiona SW1 para obtener una medición\r\n");
+    is_boot_retry = 0;	// Si se llegó a este punto sin errores de inicialización, se reinicia la bandera
 
-    int32_t voltage_mV = 0;
-    int32_t current_mA = 0;
-    INA219_Channel ch = INA219_CH1;
+    setvbuf(stdout, NULL, _IONBF, 0);
 
-    while (1) {
+//    buoyApp_init();
+//    buoyApp_run();
+    	buoyApp_tests();
+}
 
-        if (get_sw1PressEv())
-        {
-        	ret = INA219_GetVoltage(ch, &voltage_mV);
-			if (ret != INA219_OK) {
-				DPRINT("ERROR: INA219_GetVoltage(CH%d) = %d\r\n", (int)ch, ret);
-				HAL_Delay(500);
-				continue;
-			}
+int __io_putchar(int ch){
+  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
+  return ch;
+}
 
-			ret = INA219_GetCurrent(ch, &current_mA);
-			if (ret != INA219_OK) {
-				DPRINT("ERROR: INA219_GetCurrent(CH%d) = %d\r\n", (int)ch, ret);
-				HAL_Delay(500);
-				continue;
-			}
+/* Esta función se llama si se produce un error en la inicialización de los periféricos del micro */
+void Error_Handler(void){
+	__disable_irq();
 
-			DPRINT("CH%d | %ld mV | %ld mA\r\n", (int)ch, voltage_mV, current_mA);
-//
-//    		ret = INA219_DetectAndMeasure(ch, &current_mA,3100);
-//    		if (ret != INA219_OK) {
-//				DPRINT("ERROR: INA219_DetectAndMeasure(CH%d) = %d\r\n", (int)ch, ret);
-//				continue;
-//			}
-//    		DPRINT("CH%d | %ld mA\r\n", (int)ch, current_mA);
-        }
-    }
+	if(is_boot_retry == 1) {	/* Si se vuelve a producir un error durante la inicialización, se entra a un bucle infinito */
+		while(1){}
+	}
+	NVIC_SystemReset();		/* Si es la primera vez que se produce un error durante la inicialización, se resetea el micro */
+}
+
+/* En esta función se revisa si ya se produjo un reinicio por software anteriormente */
+void CheckReset_Flag(void) {
+	if (__HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST)) {
+		is_boot_retry = 1;		/* En caso afirmativo, se setea esta bandera */
+	}
+	__HAL_RCC_CLEAR_RESET_FLAGS();
 }
