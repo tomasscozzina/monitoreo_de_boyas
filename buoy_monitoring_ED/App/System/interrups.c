@@ -12,6 +12,7 @@
 #include "adxl345.h"
 #include "lorawan_wrapper.h"
 #include "system_power.h"
+#include "buoy_app.h"
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin) {

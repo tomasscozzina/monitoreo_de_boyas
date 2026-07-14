@@ -64,9 +64,17 @@ static const uint8_t CMD_NAV_POSLLH[]  = { 0xB5, 0x62, 0x01, 0x02, 0x00, 0x00, 0
 static const uint8_t CMD_NAV_TIMEUTC[] = { 0xB5, 0x62, 0x01, 0x21, 0x00, 0x00, 0x22, 0x67 };
 
 /* Variables privadas */
-static GPS_Data s_data = {0};
+static GPS_Data_t s_data = {0};
 
-/* Funciones privadas */
+/* Prototipos de funciones privadas */
+static void ubx_calcChecksum(const uint8_t *data, uint16_t len, uint8_t *ck_a, uint8_t *ck_b);
+static GPS_Status_t ubx_send(const uint8_t *query, uint16_t query_len);
+static GPS_Status_t ubx_receive(uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len);
+static GPS_Status_t ubx_sendReceive(const uint8_t *query, uint16_t query_len, uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len);
+static GPS_Status_t GPS_antenaStatus(void);
+static GPS_Status_t GPS_hasValidFix(void);
+
+/* Definiciones de funciones privadas */
 static void ubx_calcChecksum(const uint8_t *data, uint16_t len, uint8_t *ck_a, uint8_t *ck_b) {
     for (uint16_t i = 0; i < len; i++) {
         *ck_a += data[i];
@@ -74,14 +82,14 @@ static void ubx_calcChecksum(const uint8_t *data, uint16_t len, uint8_t *ck_a, u
     }
 }
 
-static GPS_Status ubx_send(const uint8_t *query, uint16_t query_len) {
+static GPS_Status_t ubx_send(const uint8_t *query, uint16_t query_len) {
     if (HAL_UART_Transmit(&huart1, query, query_len, GPS_TIMEOUT_MS) != HAL_OK){
     	return GPS_ERR_COMMS;
     }
     return GPS_OK;
 }
 
-static GPS_Status ubx_receive(uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len) {
+static GPS_Status_t ubx_receive(uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len) {
     uint32_t start = HAL_GetTick();
     uint8_t byte;
     uint8_t sync_state = 0;
@@ -154,7 +162,7 @@ static GPS_Status ubx_receive(uint8_t exp_class, uint8_t exp_id, uint8_t *payloa
     return GPS_OK;
 }
 
-static GPS_Status ubx_sendReceive(const uint8_t *query, uint16_t query_len, uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len) {
+static GPS_Status_t ubx_sendReceive(const uint8_t *query, uint16_t query_len, uint8_t exp_class, uint8_t exp_id, uint8_t *payload_out, uint16_t exp_len) {
 
     for (uint8_t i = 0; i < GPS_COMMS_REINTENTOS; i++) {
 
@@ -164,14 +172,26 @@ static GPS_Status ubx_sendReceive(const uint8_t *query, uint16_t query_len, uint
 			}
 		}
 		HAL_Delay(100);
-		DPRINT("Reintento n° %d \r\n", i);
 	}
+    // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz UART
+	HAL_UART_MspDeInit(&huart1);
+	HAL_UART_MspInit(&huart1);
+
+	// Se repiten los 5 intentos
+    for (uint8_t i = 0; i < GPS_COMMS_REINTENTOS; i++) {
+
+		if (ubx_send(query, query_len) == GPS_OK) {
+			if (ubx_receive(exp_class, exp_id, payload_out, exp_len) == GPS_OK) {
+				return GPS_OK;
+			}
+		}
+		HAL_Delay(100);
+	}
+    // Luego de los 10 intentos fallidos (habiendo reiniciado la interfaz de por medio) se retorna GPS_ERR_COMMS
     return GPS_ERR_COMMS;
 }
 
-/* API pública */
-
-GPS_Status GPS_antenaStatus(void) {
+static GPS_Status_t GPS_antenaStatus(void) {
 
 	/* Solicitud de MON_HW */
     uint8_t hw_payload[UBX_PAYLOAD_MON_HW];
@@ -182,8 +202,8 @@ GPS_Status GPS_antenaStatus(void) {
     uint8_t aStatus = hw_payload[MON_HW_OFFSET_ASTATUS];	// [20] aStatus  — 0:init, 1:unknown, 2:OK, 3:short, 4:open
     uint8_t aPower  = hw_payload[MON_HW_OFFSET_APOWER];		// [21] aPower   — 0:off, 1:on
 
-    DPRINT("ANTENA_STATUS: %d \n\r", aStatus);
-    DPRINT("ANTENA_POWER: %d \n\r", aPower);
+//    DPRINT("ANTENA_STATUS: %d \n\r", aStatus);
+//    DPRINT("ANTENA_POWER: %d \n\r", aPower);
 
     if (aStatus != MON_HW_ASTATUS_OK || aPower != MON_HW_APOWER_ON) {
         return GPS_ERR_ANTENNA;
@@ -192,7 +212,7 @@ GPS_Status GPS_antenaStatus(void) {
     return GPS_OK;
 }
 
-GPS_Status GPS_hasValidFix(void) {
+static GPS_Status_t GPS_hasValidFix(void) {
 
     /* Solicitud de NAV-STATUS */
     uint8_t status_payload[UBX_PAYLOAD_NAV_STATUS];
@@ -203,28 +223,26 @@ GPS_Status GPS_hasValidFix(void) {
     uint8_t gpsFix = status_payload[4];		// [4] gpsFix uint8 - 2=2D fix, 3=3D fix
     uint8_t fixFlags = status_payload[5];	// [5] flags  uint8 - bit 0 = gpsFixOk
 
-	#ifdef DEBUG
-    DPRINT("GPS_FIX_STATUS: %d \n\r", (fixFlags & GPS_FIX_OK));
-    DPRINT("GPS_FIX_TYPE: %d \n\r", gpsFix);
-
-    uint8_t flags2 = status_payload[7];
-    uint8_t psmState = flags2 & 0x03;
-
-    switch(psmState) {
-        case 0: // ACQUISITION
-            DPRINT("ESTADO MEF: ACQUISITION \n\r");
-            break;
-        case 1: // TRACKING
-            DPRINT("ESTADO MEF: TRACKING \n\r");
-            break;
-        case 2: // POT
-            DPRINT("ESTADO MEF: POT (POWER OPTIMIZED TRACKING) \n\r");
-            break;
-        case 3: // INACTIVE
-            DPRINT("ESTADO MEF: INACTIVE FOR SEARCH \n\r");
-            break;
-    }
-	#endif
+//    DPRINT("GPS_FIX_STATUS: %d \n\r", (fixFlags & GPS_FIX_OK));
+//    DPRINT("GPS_FIX_TYPE: %d \n\r", gpsFix);
+//
+//    uint8_t flags2 = status_payload[7];
+//    uint8_t psmState = flags2 & 0x03;
+//
+//    switch(psmState) {
+//        case 0: // ACQUISITION
+//            DPRINT("ESTADO MEF: ACQUISITION \n\r");
+//            break;
+//        case 1: // TRACKING
+//            DPRINT("ESTADO MEF: TRACKING \n\r");
+//            break;
+//        case 2: // POT
+//            DPRINT("ESTADO MEF: POT (POWER OPTIMIZED TRACKING) \n\r");
+//            break;
+//        case 3: // INACTIVE
+//            DPRINT("ESTADO MEF: INACTIVE FOR SEARCH \n\r");
+//            break;
+//    }
 
     if ((gpsFix != GPS_FIX_2D && gpsFix != GPS_FIX_3D) || !(fixFlags & GPS_FIX_OK)) {
         return GPS_ERR_NO_FIX;
@@ -262,7 +280,17 @@ GPS_Status GPS_hasValidFix(void) {
     return GPS_OK;
 }
 
-
-void GPS_getData(GPS_Data *data) {
-    *data = s_data;
+/* API pública */
+GPS_Status_t GPS_getData(GPS_Data_t *data) {
+	GPS_Status_t ret;
+	ret = GPS_antenaStatus();
+	if(ret != GPS_OK) {
+		return ret;
+	}
+	ret = GPS_hasValidFix();
+	if(ret != GPS_OK) {
+		return ret;
+	}
+	*data = s_data;
+	return ret;
 }

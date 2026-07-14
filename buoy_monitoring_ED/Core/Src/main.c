@@ -26,14 +26,15 @@ int main(void) {
     MX_USART2_UART_Init();
     MX_I2C1_Init();
     MX_RTC_Init();
+    setvbuf(stdout, NULL, _IONBF, 0);
 
     is_boot_retry = 0;	// Si se llegó a este punto sin errores de inicialización, se reinicia la bandera
 
-    setvbuf(stdout, NULL, _IONBF, 0);
+    buoyApp_init();
 
-//    buoyApp_init();
-//    buoyApp_run();
-    	buoyApp_tests();
+    while(1) {
+    	buoyApp_run();
+    }
 }
 
 int __io_putchar(int ch){

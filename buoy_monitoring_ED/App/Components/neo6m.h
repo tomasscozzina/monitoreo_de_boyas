@@ -20,10 +20,10 @@ typedef enum {
 	GPS_ERR_COMMS,		/* Hay problemas en la comunicación con el módulo GPS */
 	GPS_ERR_NO_FIX,  	/* El GPS no tiene fix válido (2D o 3D) */
 	GPS_ERR_ANTENNA  	/* La antena del GPS está desconectada o sin alimentación */
-} GPS_Status;
+} GPS_Status_t;
 
 /* Estuctura de datos (fecha UTC) */
-typedef struct {
+typedef struct __attribute__((packed)) {
     int32_t latitude;	/* Latitud  ([°] x 1e7) */
 	int32_t longitude;	/* Longitud ([°] x 1e7) */
 	uint16_t year;    	/* Año (aaaa) */
@@ -32,13 +32,10 @@ typedef struct {
     uint8_t hour;    	/* Hora (0–23) */
     uint8_t min;     	/* Minutos (0–59) */
     uint8_t sec;     	/* Segundos (0–60) */
-} GPS_Data;
+} GPS_Data_t;
 
 /* API Pública */
-
-GPS_Status GPS_antenaStatus(void);
-GPS_Status GPS_hasValidFix(void);
-void GPS_getData(GPS_Data *data);
+GPS_Status_t GPS_getData(GPS_Data_t *data);
 
 #ifdef __cplusplus
 }

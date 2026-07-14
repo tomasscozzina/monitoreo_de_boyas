@@ -28,19 +28,19 @@ typedef enum {
     ENERGY_OK = 0,   		/* Operación exitosa */
 	ENERGY_ERR_COMMS,		/* Hay problemas en la comunicación con el sensor de energía */
 	ENERGY_ERR_BAD_TIMING	/* Se llamó a INA219_detectAndMeasure cuando la linterna transicionaba, o estaba apagada */
-} Energy_Status;
+} Energy_Status_t;
 
 /* Estuctura de datos */
-typedef struct {
+typedef struct __attribute__((packed)) {
     int16_t voltage_mV;		/* Tensión V_BUS */
 	int16_t current_mA;		/* Corriente I_SHUNT */
-} Energy_Data;
+} Energy_Data_t;
 
 /* API pública */
 
-Energy_Status INA219_initAll(void);
-Energy_Status INA219_getVoltageAndCurrent(INA219_Channel ch, Energy_Data *data);
-Energy_Status INA219_detectAndMeasure(INA219_Channel ch, int16_t *current_mA, int16_t min_voltage_mV);
+Energy_Status_t INA219_init(INA219_Channel ch);
+Energy_Status_t INA219_getVoltageAndCurrent(INA219_Channel ch, Energy_Data_t *data);
+Energy_Status_t INA219_detectAndMeasure(INA219_Channel ch, int16_t *current_mA, int16_t min_voltage_mV);
 
 #ifdef __cplusplus
 }

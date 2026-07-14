@@ -1,5 +1,4 @@
 #include "lorawan_wrapper.h"
-#include "lorawan_credentials.h"
 #include "main.h"
 #include "RadioLib.h"
 
@@ -115,6 +114,158 @@ static LoRaWANNode node(&radio, &AU915, 2);
 
 extern "C" {
 
+	/* Prototipos de funciones privadas */
+	static bool flash_restore(LoRaWANNode *node);
+	static HAL_StatusTypeDef flash_save(LoRaWANNode *node);
+
+	/* API pública */
+	void lorawan_init(lorawan_credentials_t* credentials){
+		lorawan_begin();
+		lorawan_configure(credentials);
+		lorawan_sessionRestore();
+		lorawan_join();
+		lorawan_sessionSave();
+	}
+
+	void lorawan_begin(void) {
+		DPRINT("INICIANDO RADIO\r\n");
+
+		int16_t state = radio.begin();
+		while (state != RADIOLIB_ERR_NONE){
+			DPRINT("LA INICIALIZACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+			DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
+			HAL_Delay(10000);
+
+			state = radio.begin();
+		}
+		DPRINT("INICIALIZACIÓN EXISTOSA\r\n");
+	}
+
+	void lorawan_configure(lorawan_credentials_t* credentials) {
+		DPRINT("CONFIGURANDO CREDENCIALES\r\n");
+
+		int16_t state = node.beginOTAA(credentials->joinEUI, credentials->deviceEUI, nullptr, credentials->appKey);
+		while (state != RADIOLIB_ERR_NONE){
+			DPRINT("LA CONFIGURACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+			DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
+			HAL_Delay(10000);
+
+			state = node.beginOTAA(credentials->joinEUI, credentials->deviceEUI, nullptr, credentials->appKey);
+		}
+		DPRINT("CONFIGURACIÓN EXITOSA\r\n");
+	}
+
+	void lorawan_sessionRestore(void) {
+		DPRINT("VERIFICANDO EXISTENCIA DE BUFFER NONCE DE SESIONES ANTERIORES \r\n");
+
+		bool restored = flash_restore(&node);
+		if(restored){
+			DPRINT("SE HA RESTAURADO EL BUFFER NONCE DE LA SESIÓN ANTERIOR \r\n");
+		}
+		else{
+			DPRINT("NO SE HA RESTAURADO EL BUFFER NONCE DE LA SESIÓN ANTERIOR, POR INEXISTENCIA O DATO CORROMPIDO \r\n");
+		}
+	}
+
+	void lorawan_join(void) {
+		DPRINT("ACTIVANDO END DEVICE VÍA OTAA \r\n");
+
+		int16_t state = node.activateOTAA();
+		while((state != RADIOLIB_LORAWAN_NEW_SESSION) && (state != RADIOLIB_LORAWAN_SESSION_RESTORED)){
+			DPRINT("LA ACTIVACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+			DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
+			HAL_Delay(10000);
+			state = node.activateOTAA();
+		}
+		DPRINT("ACTIVACIÓN EXITOSA \r\n");
+	}
+
+	void lorawan_sessionSave(void) {
+		DPRINT("ALMACENANDO EN NVM EL BUFFER NONCE DE LA SESIÓN ACTUAL \r\n");
+
+		HAL_StatusTypeDef result = flash_save(&node);
+		if (result == HAL_OK){
+			DPRINT("ALMACENAMIENTO EXITOSO \r\n");
+		}
+		else{
+			DPRINT("NO SE HA ALMACENADO EL BUFFER NONCE DE LA SESIÓN ACTUAL. CÓDIGO DE ERROR DE HAL: %d \r\n", result);
+		}
+	}
+
+	void lorawan_sendReceive(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink) {
+
+		*downlink = {};
+		size_t downlink_len = 0;
+		LoRaWANEvent_t evUp = {};
+		LoRaWANEvent_t evDown = {};
+
+	//        int16_t state = 0;
+		node.sendReceive((const uint8_t *) uplink->payload, uplink->len, uplink->port, downlink->data, &downlink_len, uplink->confirmed, &evUp, &evDown);
+		downlink->confirming = evDown.confirming;
+	//        DPRINT("UPLINK ENVIADO    - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMED:  %s; POWER: %d \r\n",
+	//        		uplink->len,
+	//				(char*)uplink->payload,
+	//				evUp.fCnt - 1,	// se le resta 1 porque sendRecieve suma 1 al contador fCnt luego de la transmisión
+	//				(unsigned long)(evUp.freq * 1000000UL),
+	//				evUp.datarate,
+	//				evUp.fPort,
+	//				(evUp.confirmed ? "Y" : "N"),
+	//				evUp.power);
+	//
+	//        if (state == RADIOLIB_ERR_NONE || state == 1 || state == 2) {
+	//			if (downlink_len > 0) {
+	//				downlink->len = (uint8_t)downlink_len;
+	//				downlink->port = evDown.fPort;
+	//				downlink->window = (state > 0) ? state : 0;
+	//				downlink->available = true;
+	//
+	//		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMING: %s; RSSI: %d; SNR: %d; WINDOW: %d \r\n",
+	//		        		downlink->len,
+	//						(char*)downlink->data,
+	//						evDown.fCnt,
+	//						(unsigned long)(evDown.freq * 1000000UL),
+	//						evDown.datarate,
+	//						downlink->port,
+	//						(evDown.confirming ? "Y" : "N"),
+	//						(int8_t)radio.getRSSI(),
+	//						(int8_t)radio.getSNR(),
+	//						downlink->window);
+	//			}
+	//			else {
+	//				DPRINT("NO SE RECIBIÓ DOWLINK. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+	//			}
+	//		}
+	//        else {
+	//			DPRINT("LA COMUNICACIÓN (TX O RX) FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
+	//		}
+	}
+
+	void lorawan_setADR(bool enable){
+		node.setADR(enable);
+	}
+
+	void lorawan_setDataRate(uint8_t dr){
+		node.setDatarate(dr);
+	}
+
+	int8_t lorawan_getSNR(){
+		return ((int8_t)radio.getSNR());
+	}
+
+	int8_t lorawan_getRSSI(){
+		return ((int8_t)radio.getRSSI());
+	}
+
+	void lorawan_sleep() {
+		radio.sleep();
+	}
+
+	void RFM95W_notifyG0(void) {
+		if (_g0_cb)
+			_g0_cb();	// Función de Callback
+	}
+
+	/* Definiciones de funciones privadas */
 	static bool flash_restore(LoRaWANNode *node) {
 		const uint8_t *base = (const uint8_t *)NONCE_FLASH_ADDR;
 
@@ -161,157 +312,4 @@ extern "C" {
 		HAL_FLASH_Lock();
 		return HAL_OK;
 	}
-
-	/*
-	 * %%%%%%%%%%%% INICIO DE API PÚBLICA %%%%%%%%%%%%%
-	*/
-
-    void lorawan_setup(void){
-    	lorawan_init();
-    	lorawan_configure();
-    	lorawan_session_restore();
-    	lorawan_join();
-    	lorawan_session_save();
-    }
-
-	void lorawan_init(void) {
-    	DPRINT("INICIANDO RADIO\r\n");
-
-        int16_t state = radio.begin();
-    	while (state != RADIOLIB_ERR_NONE){
-    		DPRINT("LA INICIALIZACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
-    		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
-    		HAL_Delay(10000);
-
-    		state = radio.begin();
-    	}
-    	DPRINT("INICIALIZACIÓN EXISTOSA\r\n");
-    }
-
-    void lorawan_configure(void) {
-    	DPRINT("CONFIGURANDO CREDENCIALES\r\n");
-
-    	static const uint8_t appKey[16] = LORAWAN_APP_KEY;
-
-        int16_t state = node.beginOTAA(LORAWAN_JOIN_EUI, LORAWAN_DEVICE_EUI, nullptr, appKey);
-    	while (state != RADIOLIB_ERR_NONE){
-    		DPRINT("LA CONFIGURACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
-    		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
-    		HAL_Delay(10000);
-
-    		state = node.beginOTAA(LORAWAN_JOIN_EUI, LORAWAN_DEVICE_EUI, nullptr, appKey);
-    	}
-        DPRINT("CONFIGURACIÓN EXITOSA\r\n");
-    }
-
-    void lorawan_session_restore(void) {
-    	DPRINT("VERIFICANDO EXISTENCIA DE BUFFER NONCE DE SESIONES ANTERIORES \r\n");
-
-        bool restored = flash_restore(&node);
-        if(restored){
-        	DPRINT("SE HA RESTAURADO EL BUFFER NONCE DE LA SESIÓN ANTERIOR \r\n");
-        }
-        else{
-        	DPRINT("NO SE HA RESTAURADO EL BUFFER NONCE DE LA SESIÓN ANTERIOR, POR INEXISTENCIA O DATO CORROMPIDO \r\n");
-        }
-    }
-
-    void lorawan_join(void) {
-    	DPRINT("ACTIVANDO END DEVICE VÍA OTAA \r\n");
-
-    	int16_t state = node.activateOTAA();
-        while((state != RADIOLIB_LORAWAN_NEW_SESSION) && (state != RADIOLIB_LORAWAN_SESSION_RESTORED)){
-    		DPRINT("LA ACTIVACIÓN FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
-    		DPRINT("REINTENTANDO EN 10 SEGUNDOS\r\n");
-    		HAL_Delay(10000);
-    		state = node.activateOTAA();
-        }
-        DPRINT("ACTIVACIÓN EXITOSA \r\n");
-    }
-
-    void lorawan_session_save(void) {
-    	DPRINT("ALMACENANDO EN NVM EL BUFFER NONCE DE LA SESIÓN ACTUAL \r\n");
-
-    	HAL_StatusTypeDef result = flash_save(&node);
-        if (result == HAL_OK){
-            DPRINT("ALMACENAMIENTO EXITOSO \r\n");
-        }
-        else{
-        	DPRINT("NO SE HA ALMACENADO EL BUFFER NONCE DE LA SESIÓN ACTUAL. CÓDIGO DE ERROR DE HAL: %d \r\n", result);
-        }
-    }
-
-    void lorawan_send(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink) {
-
-        *downlink = {};
-        size_t downlink_len = 0;
-        LoRaWANEvent_t evUp = {};
-        LoRaWANEvent_t evDown = {};
-
-        int16_t state = 0;
-        state = node.sendReceive((const uint8_t *) uplink->payload, uplink->len, uplink->port, downlink->data, &downlink_len, uplink->confirmed, &evUp, &evDown);
-
-        DPRINT("UPLINK ENVIADO    - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMED:  %s; POWER: %d \r\n",
-        		uplink->len,
-				(char*)uplink->payload,
-				evUp.fCnt - 1,	// se le resta 1 porque sendRecieve suma 1 al contador fCnt luego de la transmisión
-				(unsigned long)(evUp.freq * 1000000UL),
-				evUp.datarate,
-				evUp.fPort,
-				(evUp.confirmed ? "Y" : "N"),
-				evUp.power);
-
-        if (state == RADIOLIB_ERR_NONE || state == 1 || state == 2) {
-			if (downlink_len > 0) {
-				downlink->len = (uint8_t)downlink_len;
-				downlink->port = evDown.fPort;
-				downlink->window = (state > 0) ? state : 0;
-				downlink->available = true;
-
-		        DPRINT("DOWNLINK RECIBIDO - PAYLOAD: %.*s; COUNTER: %lu; FREC: %lu; DR: %d; PORT: %d; CONFIRMING: %s; RSSI: %d; SNR: %d; WINDOW: %d \r\n",
-		        		downlink->len,
-						(char*)downlink->data,
-						evDown.fCnt,
-						(unsigned long)(evDown.freq * 1000000UL),
-						evDown.datarate,
-						downlink->port,
-						(evDown.confirming ? "Y" : "N"),
-						(int8_t)radio.getRSSI(),
-						(int8_t)radio.getSNR(),
-						downlink->window);
-			}
-			else {
-				DPRINT("NO SE RECIBIÓ DOWLINK. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
-			}
-		}
-        else {
-			DPRINT("LA COMUNICACIÓN (TX O RX) FALLÓ. CÓDIGO DE ERROR DE RADIOLIB: %d\n\r", state);
-		}
-    }
-
-    void lorawan_setADR(bool enable){
-    	node.setADR(enable);
-    }
-
-    void lorawan_setDataRate(uint8_t dr){
-    	node.setDatarate(dr);
-    }
-
-    int8_t lorawan_getSNR(){
-    	return ((int8_t)radio.getSNR());
-    }
-
-    int8_t lorawan_getRSSI(){
-    	return ((int8_t)radio.getRSSI());
-    }
-
-    void RFM95W_notifyG0(void) {
-        if (_g0_cb)
-        	_g0_cb();	// Función de Callback
-    }
-
-	/*
-	 * %%%%%%%%%%%% FIN DE API PÚBLICA %%%%%%%%%%%%%
-	*/
-}
-
+} // Fin del extern C

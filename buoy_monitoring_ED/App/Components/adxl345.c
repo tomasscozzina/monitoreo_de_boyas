@@ -31,7 +31,6 @@
 #define CFG_POWER_CTL_MEASURE   		0x08
 #define CFG_DATA_FORMAT         		0x00
 #define CFG_BW_RATE             		0x0A
-#define CFG_THRESH_ACT          		0xFF	// Escala de Activity (Impacto) = 62.5 mg/LSB -> 0xFF ~ 16g
 #define CFG_ACT_INACT_CTL       		0xF0
 #define CFG_INT_MAP             		0x80	// Activity a INT1 - Data Ready a INT2
 #define CFG_INT_ENABLE  				0x90	// IRQ habilitada por Activity y Data Ready
@@ -52,21 +51,35 @@ static volatile bool impact_flag     = false;
 static bool en_espera_antirebote = false;
 static uint32_t start = 0;
 
-/* Funciones privadas */
+/* Prototipos de funciones privadas */
+static Acel_Status_t reg_write(uint8_t reg, uint8_t value);
+static Acel_Status_t reg_read(uint8_t reg, uint8_t *data, uint8_t len);
 
-static Acel_Status reg_write(uint8_t reg, uint8_t value) {
+/* Definiciones de funciones privadas */
+static Acel_Status_t reg_write(uint8_t reg, uint8_t value) {
 	uint8_t buf[2] = {reg, value};
     for (uint8_t i = 0; i < ADXL345_COMMS_REINTENTOS; i++) {
     	if (HAL_I2C_Master_Transmit(&hi2c1, ADXL345_I2C_ADDR_SHIFT, buf, 2, 10) == HAL_OK) {
     	    return ACEL_OK;
     	}
 		HAL_Delay(100);
-		DPRINT("Reintento n° %d \r\n", i);
 	}
+    // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz I2C
+    HAL_I2C_MspDeInit(&hi2c1);
+    HAL_I2C_MspInit(&hi2c1);
+
+    // Se repiten los 5 intentos
+    for (uint8_t i = 0; i < ADXL345_COMMS_REINTENTOS; i++) {
+    	if (HAL_I2C_Master_Transmit(&hi2c1, ADXL345_I2C_ADDR_SHIFT, buf, 2, 10) == HAL_OK) {
+    	    return ACEL_OK;
+    	}
+		HAL_Delay(100);
+	}
+    // Luego de los 10 intentos fallidos (habiendo reiniciado la interfaz de por medio) se retorna ACEL_ERR_COMMS
     return ACEL_ERR_COMMS;
 }
 
-static Acel_Status reg_read(uint8_t reg, uint8_t *data, uint8_t len) {
+static Acel_Status_t reg_read(uint8_t reg, uint8_t *data, uint8_t len) {
 	for (uint8_t i = 0; i < ADXL345_COMMS_REINTENTOS; i++) {
 		if (HAL_I2C_Master_Transmit(&hi2c1, ADXL345_I2C_ADDR_SHIFT, &reg, 1, 10) == HAL_OK) {
 			if (HAL_I2C_Master_Receive(&hi2c1, ADXL345_I2C_ADDR_SHIFT, data, len, 10) == HAL_OK) {
@@ -74,14 +87,27 @@ static Acel_Status reg_read(uint8_t reg, uint8_t *data, uint8_t len) {
 			}
 		}
 		HAL_Delay(100);
-		DPRINT("Reintento n° %d \r\n", i);
 	}
+    // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz I2C
+    HAL_I2C_MspDeInit(&hi2c1);
+    HAL_I2C_MspInit(&hi2c1);
+
+    // Se repiten los 5 intentos
+	for (uint8_t i = 0; i < ADXL345_COMMS_REINTENTOS; i++) {
+		if (HAL_I2C_Master_Transmit(&hi2c1, ADXL345_I2C_ADDR_SHIFT, &reg, 1, 10) == HAL_OK) {
+			if (HAL_I2C_Master_Receive(&hi2c1, ADXL345_I2C_ADDR_SHIFT, data, len, 10) == HAL_OK) {
+				return ACEL_OK;
+			}
+		}
+		HAL_Delay(100);
+	}
+	// Luego de los 10 intentos fallidos (habiendo reiniciado la interfaz de por medio) se retorna ACEL_ERR_COMMS
     return ACEL_ERR_COMMS;
 }
 
 /* API pública */
 
-Acel_Status ADXL345_init(void) {
+Acel_Status_t ADXL345_init(uint8_t impact_threshold) {
 
     // Poner en standby antes de configurar
     if(reg_write(REG_POWER_CTL, CFG_POWER_CTL_STANDBY) == ACEL_ERR_COMMS) {
@@ -99,7 +125,7 @@ Acel_Status ADXL345_init(void) {
     }
 
     // Threshold de actividad: 16g (ajustar experimentalmente)
-    if(reg_write(REG_THRESH_ACT, CFG_THRESH_ACT) == ACEL_ERR_COMMS) {
+    if(reg_write(REG_THRESH_ACT, impact_threshold) == ACEL_ERR_COMMS) {
     	return ACEL_ERR_COMMS;
     }
 
@@ -141,7 +167,7 @@ Acel_Status ADXL345_init(void) {
     return ACEL_OK;
 }
 
-Acel_Status ADXL345_getTilt(uint8_t *tilt) {
+Acel_Status_t ADXL345_getTilt(uint8_t *tilt) {
     int32_t sum_x = 0, sum_y = 0, sum_z = 0;
 
     /* EXPLICACIÓN:
@@ -209,7 +235,7 @@ void ADXL345_notifyImpact(void) {
 	impact_flag = true;
 }
 
-bool ADXL345_getImpactEv(Acel_Status *ret) {
+bool ADXL345_getImpactEv(Acel_Status_t *ret) {
     if (en_espera_antirebote == true) {
         if (HAL_GetTick() - start >= ANTIREBOTE) {
             en_espera_antirebote = false;

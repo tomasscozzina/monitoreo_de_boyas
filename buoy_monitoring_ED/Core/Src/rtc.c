@@ -18,12 +18,6 @@ void MX_RTC_Init(void)
   {
     Error_Handler();
   }
-
-  // TOMI: En el segundo argumento de esta función se configuran los segundos que contará el RTC. Va 900 por defecto (15 min)
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 30, RTC_WAKEUPCLOCK_CK_SPRE_16BITS, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
 }
 
 void HAL_RTC_MspInit(RTC_HandleTypeDef* rtcHandle)

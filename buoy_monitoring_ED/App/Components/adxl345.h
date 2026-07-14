@@ -19,15 +19,15 @@ extern "C" {
 typedef enum {
     ACEL_OK  =  0,   	/* Operación exitosa */
 	ACEL_ERR_COMMS,		/* Hay problemas en la comunicación con el acelerómetro */
-} Acel_Status;
+} Acel_Status_t;
 
 /* API Pública */
 
-Acel_Status ADXL345_init(void);
-Acel_Status ADXL345_getTilt(uint8_t *tilt);
+Acel_Status_t ADXL345_init(uint8_t impact_threshold);
+Acel_Status_t ADXL345_getTilt(uint8_t *tilt);
 void ADXL345_notifyDataReady(void);
 void ADXL345_notifyImpact(void);
-bool ADXL345_getImpactEv(Acel_Status *ret);
+bool ADXL345_getImpactEv(Acel_Status_t *ret);
 
 #ifdef __cplusplus
 }
