@@ -74,6 +74,21 @@ static GPS_Status_t ubx_sendReceive(const uint8_t *query, uint16_t query_len, ui
 static GPS_Status_t GPS_antenaStatus(void);
 static GPS_Status_t GPS_hasValidFix(void);
 
+/* API pública */
+GPS_Status_t GPS_getData(GPS_Data_t *data) {
+	GPS_Status_t ret;
+	ret = GPS_antenaStatus();
+	if(ret != GPS_OK) {
+		return ret;
+	}
+	ret = GPS_hasValidFix();
+	if(ret != GPS_OK) {
+		return ret;
+	}
+	*data = s_data;
+	return ret;
+}
+
 /* Definiciones de funciones privadas */
 static void ubx_calcChecksum(const uint8_t *data, uint16_t len, uint8_t *ck_a, uint8_t *ck_b) {
     for (uint16_t i = 0; i < len; i++) {
@@ -174,8 +189,8 @@ static GPS_Status_t ubx_sendReceive(const uint8_t *query, uint16_t query_len, ui
 		HAL_Delay(100);
 	}
     // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz UART
-	HAL_UART_MspDeInit(&huart1);
-	HAL_UART_MspInit(&huart1);
+    HAL_UART_DeInit(&huart1);
+    HAL_UART_Init(&huart1);
 
 	// Se repiten los 5 intentos
     for (uint8_t i = 0; i < GPS_COMMS_REINTENTOS; i++) {
@@ -278,19 +293,4 @@ static GPS_Status_t GPS_hasValidFix(void) {
     s_data.sec   = timeutc_payload[18];
 
     return GPS_OK;
-}
-
-/* API pública */
-GPS_Status_t GPS_getData(GPS_Data_t *data) {
-	GPS_Status_t ret;
-	ret = GPS_antenaStatus();
-	if(ret != GPS_OK) {
-		return ret;
-	}
-	ret = GPS_hasValidFix();
-	if(ret != GPS_OK) {
-		return ret;
-	}
-	*data = s_data;
-	return ret;
 }

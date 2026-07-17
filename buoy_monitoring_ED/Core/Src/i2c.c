@@ -55,14 +55,14 @@ void MX_I2C1_Init(void)
   */
   if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler();	// Este si puede ejecutarse
   }
 
   /** Configure Digital filter
   */
   if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler();	// Este si puede ejecutarse
   }
   /* USER CODE BEGIN I2C1_Init 2 */
 
@@ -87,7 +87,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_PCLK1;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
-      Error_Handler();
+      Error_Handler();	// Este si puede ejecutarse
     }
 
     __HAL_RCC_GPIOB_CLK_ENABLE();

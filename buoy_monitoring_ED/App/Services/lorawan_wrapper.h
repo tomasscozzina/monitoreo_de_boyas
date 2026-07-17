@@ -10,6 +10,14 @@ extern "C"
 {
 #endif
 
+	/* Códigos de retorno */
+	typedef enum {
+		LORA_JOIN_OK  =  0,   	/* La activación (JOIN) fue exitosa */
+		LORA_UP_OK,				/* Se transmitió Uplink SIN recepción de Downlink */
+		LORA_DOWN_AVAILABLE,	/* Se transmitió Uplink CON recepción de Downlink */
+		LORA_ERR_COMMS,			/* La comunicación con el Network Server (NS) falló */
+	} LoRaWAN_Status_t;
+
 	typedef struct {
 		uint64_t joinEUI;
 		uint64_t deviceEUI;
@@ -17,34 +25,26 @@ extern "C"
 	} lorawan_credentials_t;
 
     typedef struct {
-        uint8_t data[256];
-        uint8_t len;
-        uint8_t port;
-        bool available;
-        uint8_t window;	// 1 = RX1, 2 = RX2
-        bool confirming;
-    } lorawan_downlink_t;
-
-    typedef struct {
-        const void *payload;    // Puntero genérico (acepta cualquier tipo de dato)
-        uint8_t len;            // Tamaño en bytes
-        uint8_t port;           // Puerto LoRaWAN (1-223)
-        bool confirmed;         // true = Confirmed, false = Unconfirmed
+        const void *payload;    /* Puntero genérico (acepta cualquier tipo de dato) */
+        uint8_t len;			/* Tamaño del payload, en bytes */
+        uint8_t port;           /* Puerto LoRaWAN (1-223) */
+        bool confirmed;         /* true = Confirmed, false = Unconfirmed */
     } lorawan_uplink_t;
 
-    void lorawan_init(lorawan_credentials_t* credentials);
-    void lorawan_begin(void);
-    void lorawan_configure(lorawan_credentials_t* credentials);
-    void lorawan_sessionRestore(void);
-    void lorawan_join(void);
-    void lorawan_sessionSave(void);
-    void lorawan_sendReceive(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
+    typedef struct {
+    	bool confirming;		/* Acuse del recibo del Uplink confirmed anterior: true = Confirming, false = Unconfirming */
+    	bool available;			/* Hay payload dispobible en el Downlink */
+        uint8_t data[242];		/* Arreglo de RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE bytes para la recepción del Dowlink */
+    } lorawan_downlink_t;
+
+    LoRaWAN_Status_t lorawan_init(lorawan_credentials_t* credentials);
+    LoRaWAN_Status_t lorawan_sendReceive(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
     void lorawan_setADR(bool enable);
     void lorawan_setDataRate(uint8_t dr);
-    int8_t lorawan_getSNR();
-    int8_t lorawan_getRSSI();
+    int8_t lorawan_getSNR(void);
+    int8_t lorawan_getRSSI(void);
     void RFM95W_notifyG0(void);
-    void lorawan_sleep();
+    void lorawan_sleep(void);
 
 #ifdef __cplusplus
 }

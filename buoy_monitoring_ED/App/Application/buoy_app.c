@@ -7,7 +7,10 @@
 #include "buoy_app.h"
 #include <string.h>
 
-payload_t payload = {0};
+#define LORAWAN_CONFIRMED_RETRIES 10
+
+uint32_t tx_period_s = TX_PERIOD_S;
+
 lorawan_credentials_t credentials = {
     .joinEUI   = LORAWAN_JOIN_EUI,
     .deviceEUI = LORAWAN_DEVICE_EUI,
@@ -15,24 +18,29 @@ lorawan_credentials_t credentials = {
 };
 
 /* Prototipos de funciones privadas */
-void take_measurements(payload_t *payload);
-void transmit_data(payload_t *payload);
+void take_measurements(payloadUp_t *payload);
+void transmit_data(payloadUp_t *payload);
 void goto_sleep(void);
 
 /* Definiciones de funciones públicas */
 void buoyApp_init(void) {
-	lorawan_init(&credentials);
+	DPRINT("INICIANDO EL SISTEMA ... \n\r");
+	while(lorawan_init(&credentials) != LORA_JOIN_OK) {
+		DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
+		goto_sleep();
+	}
+	DPRINT("JOIN OK \n\r");
 }
 
 void buoyApp_run(void) {
-	payload_t payload = {0};
+	payloadUp_t payload = {0};
 	take_measurements(&payload);
 	transmit_data(&payload);
 	goto_sleep();
 }
 
 /* Definiciones de funciones privadas */
-void take_measurements(payload_t *payload) {
+void take_measurements(payloadUp_t *payload) {
 	static bool acel_status = true;
 	static bool solarSens_status = true;
 	static bool baterySens_status = true;
@@ -58,7 +66,7 @@ void take_measurements(payload_t *payload) {
 			acel_status = false; // Ya era false, pero por las dudas
 			payload->acel_status = false;
 			payload->tilt = tilt_temp;
-			DPRINT("ACEL: %d \n\r", tilt_temp);
+			DPRINT("ACEL: %d°\n\r", tilt_temp);
 		}
 		else {
 			acel_status = true;
@@ -278,33 +286,64 @@ void take_measurements(payload_t *payload) {
 	}
 }
 
-void transmit_data(payload_t *payload) {
-	lorawan_downlink_t downlink;
-	lorawan_uplink_t uplink;
+void transmit_data(payloadUp_t *payload) {
+	lorawan_downlink_t downlink = {0};
+	lorawan_uplink_t uplink = {0};
+	/* Reestructuro el payload del Downlink, para mayor practicidad */
+	payloadDown_t *payloadDown = (payloadDown_t*) downlink.data;
 
-	bool confirmed = false;
-	if(payload->gps_set || payload->impact) {
-		confirmed = true;
-	}
+	bool system_reboot = false;
+	bool confirmed = (payload->gps_set || payload->impact);
 
 	uplink.payload = payload;
-	uplink.len = sizeof(payload_t);
+	uplink.len = sizeof(payloadUp_t);
 	uplink.port = LORAWAN_PORT;
 	uplink.confirmed = confirmed;
 
-	DPRINT("LORAWAN: SEND \n\r");
-	lorawan_sendReceive(&uplink, &downlink);
-	/* Mientras el Tx sea confirmado y Rx no acuse recibo, se repite la Tx */
-	while(confirmed & !(downlink.confirming)) {
-		HAL_Delay(2000);
+	LoRaWAN_Status_t LoRaWAN_Status;
+	uint8_t retries = LORAWAN_CONFIRMED_RETRIES;
+	do {
 		DPRINT("LORAWAN: SEND \n\r");
-		lorawan_sendReceive(&uplink, &downlink);
+		LoRaWAN_Status = lorawan_sendReceive(&uplink, &downlink);
+		if(LoRaWAN_Status == LORA_ERR_COMMS) {
+			DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL UPLINK. REINICIANDO EL JOIN \n\r");
+			if(lorawan_init(&credentials) == LORA_ERR_COMMS) {
+				DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL JOIN. REINICIANDO EL SISTEMA \n\r");
+				Error_Handler();
+			}
+			DPRINT("LORAWAN: JOIN OK \n\r");
+		}
+		else if(LoRaWAN_Status == LORA_DOWN_AVAILABLE) {
+			if(downlink.available){
+				DPRINT("LORAWAN: PAYLOAD RECIBIDO EN EL DOWNLINK \n\r");
+				if(payloadDown->tx_period_s > 0) {
+					DPRINT("LORAWAN: COMANDO PARA EL AJUSTE DEL PERIODO DE TX \n\r");
+					tx_period_s = (uint32_t)payloadDown->tx_period_s;
+				}
+				if(payloadDown->system_reboot) {
+				    system_reboot = true;
+				}
+			}
+		}
+		/* Si el Uplink era confirmed y el Downlink no lo confirma (o no se recibió Downlink (LORA_UP_OK)
+		 * o falló la transmisión del Uplink (LORA_ERR_COMMS)) se reintenta LORAWAN_CONFIRMED_RETRIES veces */
+		if(confirmed && !(downlink.confirming) && (retries > 0)) {
+			DPRINT("LORAWAN: UPLINK CONFIRMED SIN ACUSE DE RECIBO. REINTENTANDO EN 5 SEGUNDOS \n\r");
+			HAL_Delay(5000);
+		}
+		retries--;
+	} while(confirmed && !(downlink.confirming) && (retries > 0));
+
+	if(system_reboot) {
+		DPRINT("LORAWAN: COMANDO PARA EL REINICIO DEL SISTEMA. REINICIANDO ... \n\r");
+		Error_Handler();
 	}
 }
 
 void goto_sleep(void) {
-	lorawan_sleep();
 	DPRINT("SLEEP \n\r");
-	SystemPower_sleep(TX_PERIOD_S);
+	DPRINT("------------------------------ \n\r");	/* Separador de paquetes en consola */
+	lorawan_sleep();
+	SystemPower_sleep(tx_period_s);
 	DPRINT("WAKE UP \n\r");
 }

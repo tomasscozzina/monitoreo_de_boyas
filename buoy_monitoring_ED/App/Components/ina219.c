@@ -138,8 +138,8 @@ static Energy_Status_t reg_write(uint8_t addr, uint8_t reg, uint16_t value) {
     	HAL_Delay(100);
     }
     // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz I2C
-    HAL_I2C_MspDeInit(&hi2c1);
-    HAL_I2C_MspInit(&hi2c1);
+    HAL_I2C_DeInit(&hi2c1);
+    HAL_I2C_Init(&hi2c1);
 
     // Se repiten los 5 intentos
     for(uint8_t i = 0; i < INA219_COMMS_REINTENTOS; i++) {
@@ -165,8 +165,8 @@ static Energy_Status_t reg_read(uint8_t addr, uint8_t reg, uint16_t *value) {
     	HAL_Delay(100);
     }
     // Si luego de 5 intentos, la comunicación sigue fallando, se reinicia la interfaz I2C
-    HAL_I2C_MspDeInit(&hi2c1);
-    HAL_I2C_MspInit(&hi2c1);
+    HAL_I2C_DeInit(&hi2c1);
+    HAL_I2C_Init(&hi2c1);
 
     // Se repiten los 5 intentos
     for(uint8_t i = 0; i < INA219_COMMS_REINTENTOS; i++) {
