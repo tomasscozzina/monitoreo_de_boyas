@@ -48,9 +48,15 @@
 #define MON_HW_ASTATUS_OK   		2
 #define MON_HW_APOWER_ON    		1
 
+/* Valores máximos de agcCnt y jamInd en MON-HW */
+#define MON_HW_AGCCNT_MAX  			6550
+#define MON_HW_JAMIND_MAX    		10
+
 /* Offsets del payload MON-HW */
+#define MON_HW_OFFSET_AGCCNT	   	18
 #define MON_HW_OFFSET_ASTATUS   	20
 #define MON_HW_OFFSET_APOWER    	21
+#define MON_HW_OFFSET_JAMIND    	53
 
 /* Valores válidos de gpsFix en NAV-STATUS */
 #define GPS_FIX_2D   				2
@@ -214,13 +220,16 @@ static GPS_Status_t GPS_antenaStatus(void) {
     	return GPS_ERR_COMMS;
     }
 
-    uint8_t aStatus = hw_payload[MON_HW_OFFSET_ASTATUS];	// [20] aStatus  — 0:init, 1:unknown, 2:OK, 3:short, 4:open
-    uint8_t aPower  = hw_payload[MON_HW_OFFSET_APOWER];		// [21] aPower   — 0:off, 1:on
+    uint16_t agcCnt = (uint16_t)hw_payload[MON_HW_OFFSET_AGCCNT] |
+                      ((uint16_t)hw_payload[MON_HW_OFFSET_AGCCNT + 1] << 8);	// [18] agcCnt   — rango (0,8191)
+    uint8_t aStatus = hw_payload[MON_HW_OFFSET_ASTATUS];						// [20] aStatus  — 0:init, 1:unknown, 2:OK, 3:short, 4:open
+    uint8_t aPower  = hw_payload[MON_HW_OFFSET_APOWER];							// [21] aPower   — 0:off, 1:on
+    uint8_t jamInd  = hw_payload[MON_HW_OFFSET_JAMIND];							// [53] jamInd	 — rango (0,255)
 
 //    DPRINT("ANTENA_STATUS: %d \n\r", aStatus);
 //    DPRINT("ANTENA_POWER: %d \n\r", aPower);
 
-    if (aStatus != MON_HW_ASTATUS_OK || aPower != MON_HW_APOWER_ON) {
+    if (aStatus != MON_HW_ASTATUS_OK || aPower != MON_HW_APOWER_ON || ((agcCnt > MON_HW_AGCCNT_MAX) && (jamInd > MON_HW_JAMIND_MAX))) {
         return GPS_ERR_ANTENNA;
     }
 

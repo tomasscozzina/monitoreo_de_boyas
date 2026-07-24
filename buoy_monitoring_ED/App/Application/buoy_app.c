@@ -25,6 +25,7 @@ void goto_sleep(void);
 /* Definiciones de funciones públicas */
 void buoyApp_init(void) {
 	DPRINT("INICIANDO EL SISTEMA ... \n\r");
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	while(lorawan_init(&credentials) != LORA_JOIN_OK) {
 		DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
 		goto_sleep();
@@ -343,7 +344,9 @@ void transmit_data(payloadUp_t *payload) {
 void goto_sleep(void) {
 	DPRINT("SLEEP \n\r");
 	DPRINT("------------------------------ \n\r");	/* Separador de paquetes en consola */
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	lorawan_sleep();
 	SystemPower_sleep(tx_period_s);
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	DPRINT("WAKE UP \n\r");
 }
