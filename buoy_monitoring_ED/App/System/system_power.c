@@ -11,7 +11,8 @@
 
 static volatile bool rtc_flag = false;
 
-void SystemPower_sleep(uint32_t seconds) {
+void SystemPower_sleep(uint32_t minuts) {
+	uint32_t seconds = minuts * 60;
 	if(seconds > 65535) {
 		seconds = 65535; // Tiempo máximo del contador. Equivale a 18 horas, 12 minutos y 15 segundos
 	}

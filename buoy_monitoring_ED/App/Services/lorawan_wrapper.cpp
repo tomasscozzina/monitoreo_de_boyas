@@ -28,7 +28,7 @@
 #define LORAWAN_UPLINK_REINTENTOS	5
 
 /* Tamaño del payload esperado en el Downlink */
-#define DOWNLINK_PAYLOAD_LEN		2
+#define DOWNLINK_PAYLOAD_LEN		1
 
 /* Puntero a la función de callback */
 static void (*_g0_cb)(void) = nullptr;
@@ -182,7 +182,7 @@ extern "C" {
 		else {
 			/* Se envió Uplink y NO se recibió Dowlink, o se produjo un error en la comunicación */
 			memset(downlink, 0, sizeof(lorawan_downlink_t));
-			(state == RADIOLIB_ERR_NONE) ? ret = LORA_UP_OK : ret = LORA_ERR_COMMS;
+			ret = (state == RADIOLIB_ERR_NONE) ? LORA_UP_OK : LORA_ERR_COMMS;
 		}
 		return ret;
 	}

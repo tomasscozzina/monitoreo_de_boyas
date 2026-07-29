@@ -20,12 +20,13 @@ extern "C" {
 #include "lorawan_wrapper.h"
 #include "system_power.h"
 
-/* Tamaño del payload del Uplink: 26 bytes */
+/* Tamaño del payload del Uplink: 27 bytes */
 typedef struct __attribute__((packed)) {
 	GPS_Data_t gps;					 /* 15 bytes */
 	uint8_t tilt;					 /* 1  bytes */
 	Energy_Data_t solarP;			 /* 4  bytes */
 	Energy_Data_t batery;			 /* 4  bytes */
+	uint8_t tx_period_min;		 	 /* 1  bytes */
 	/* Flags */						 /* 2  bytes */
 	uint16_t gps_status 		:2;	 /* 0 = GPS_OK - 1 = GPS_ERR_COMMS - 2 = GPS_ERR_NO_FIX - 3 = GPS_ERR_ANTENNA */
 	uint16_t acel_status		:1;	 /* 0 = ACEL_OK - 1 = ACEL_ERR_COMMS */
@@ -37,13 +38,14 @@ typedef struct __attribute__((packed)) {
 	uint16_t impact				:1;	 /* 0 = NO_IMPACT - 1 = IMPACT */
 	uint16_t lantern_failure	:1;	 /* 0 = NO_FAILURE - 1 = FAILURE */
 	uint16_t flasher_failure	:1;  /* 0 = NO_FAILURE - 1 = FAILURE */
-	uint16_t padding			:5;	 /* RESERVED BITS */
+	uint16_t system_rebooted	:1;  /* 0 = NO_REBOOTED - 1 = REBOOTED */
+	uint16_t padding			:4;	 /* RESERVED BITS */
 }payloadUp_t;
 
 /* Tamaño del payload del Downlink: 2 bytes */
 typedef struct __attribute__((packed)) {
-	uint16_t system_reboot		:1;  /* 0 = NO_REBOOT - 1 = REBOOT */
-	uint16_t tx_period_s		:15; /* Periodo de Tx en segundos (0 - 32767) */
+	uint8_t system_reboot		:1;  /* 0 = NO_REBOOT - 1 = REBOOT */
+	uint8_t tx_period_min		:7;  /* Periodo de Tx en minutos (0 - 127) */
 }payloadDown_t;
 
 void buoyApp_init(void);

@@ -26,7 +26,7 @@ extern "C" {
 #define LANTERN_MIN_MA		4		// Corriente mínima admisible en la linterna, en mA. Si es menor a esto, se emite una alerta.
 #define	LANTERN_PERIOD_MS	16000	// Periodo del patrón de destello de la linterna, en ms
 #define GPS_TIMECAP_MS		60000	// Máximo tiempo que se le permite al GPS lograr un FIX, en ms. Si no se consigue el FIX en este tiempo, se emite una alerta.
-#define TX_PERIOD_S			10		// Tiempo entre transmisiones periodicas, en segundos. Máx = 32767 segundos (Apróx 9 horas). DEFAULT: 900 (15 min)
+#define TX_PERIOD_MIN		1		// Tiempo entre transmisiones periodicas, en minutos. Máx = 127 minutos (Apróx 2 horas). DEFAULT: 15 min
 
 #ifdef __cplusplus
 }

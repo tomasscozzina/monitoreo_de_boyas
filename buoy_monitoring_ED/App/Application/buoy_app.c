@@ -9,7 +9,8 @@
 
 #define LORAWAN_CONFIRMED_RETRIES 10
 
-uint32_t tx_period_s = TX_PERIOD_S;
+bool system_rebooted = false;
+uint32_t tx_period_min = TX_PERIOD_MIN;
 
 lorawan_credentials_t credentials = {
     .joinEUI   = LORAWAN_JOIN_EUI,
@@ -30,6 +31,8 @@ void buoyApp_init(void) {
 		DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
 		goto_sleep();
 	}
+	lorawan_sleep();
+	system_rebooted = true;
 	DPRINT("JOIN OK \n\r");
 }
 
@@ -42,35 +45,35 @@ void buoyApp_run(void) {
 
 /* Definiciones de funciones privadas */
 void take_measurements(payloadUp_t *payload) {
-	static bool acel_status = true;
-	static bool solarSens_status = true;
-	static bool baterySens_status = true;
-	static bool lanternSens_status = true;
+	static bool acel_config = true;
+	static bool solarSens_config = true;
+	static bool baterySens_config = true;
+	static bool lanternSens_config = true;
 
 	/* Acelerómetro */
-	if(acel_status) {
+	if(acel_config) {
 		if(ADXL345_init(IMPACT_THRESHOLD) == ACEL_OK) {
-			acel_status = false;
+			acel_config = false;
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una medición
 			DPRINT("ACEL: CONFIG \n\r");
 		}
 		else {
-			acel_status = true; // Ya era true, pero por las dudas
+			acel_config = true; // Ya era true, pero por las dudas
 			payload->acel_status = true;
 			payload->tilt = 0;
 			DPRINT("ACEL: ERR COMMS \n\r");
 		}
 	}
-	if(!acel_status) {
+	if(!acel_config) {
 		uint8_t tilt_temp;
 		if(ADXL345_getTilt(&tilt_temp) == ACEL_OK) {
-			acel_status = false; // Ya era false, pero por las dudas
+			acel_config = false; // Ya era false, pero por las dudas
 			payload->acel_status = false;
 			payload->tilt = tilt_temp;
 			DPRINT("ACEL: %d°\n\r", tilt_temp);
 		}
 		else {
-			acel_status = true;
+			acel_config = true;
 			payload->acel_status = true;
 			payload->tilt = 0;
 			DPRINT("ACEL: ERR COMMS \n\r");
@@ -78,29 +81,29 @@ void take_measurements(payloadUp_t *payload) {
 	}
 
 	/* Sensor de energía del panel solar */
-	if(solarSens_status) {
+	if(solarSens_config) {
 		if(INA219_init(INA219_SOLAR) == ENERGY_OK) {
-			solarSens_status = false;
+			solarSens_config = false;
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una medición
 			DPRINT("SOLAR: CONFIG \n\r");
 		}
 		else {
-			solarSens_status = true; // Ya era true, pero por las dudas
+			solarSens_config = true; // Ya era true, pero por las dudas
 			payload->solarSens_status = true;
 			memset(&(payload->solarP), 0, sizeof(Energy_Data_t));
 			DPRINT("SOLAR: ERR COMMS \n\r");
 		}
 	}
-	if(!solarSens_status) {
+	if(!solarSens_config) {
 		Energy_Data_t solarP_temp;
 		if(INA219_getVoltageAndCurrent(INA219_SOLAR, &solarP_temp) == ENERGY_OK) {
-			solarSens_status = false; // Ya era false, pero por las dudas
+			solarSens_config = false; // Ya era false, pero por las dudas
 			payload->solarSens_status = false;
 			payload->solarP = solarP_temp;
 			DPRINT("SOLAR: %d mV - %d mA \n\r", solarP_temp.voltage_mV, solarP_temp.current_mA);
 		}
 		else {
-			solarSens_status = true;
+			solarSens_config = true;
 			payload->solarSens_status = true;
 			memset(&(payload->solarP), 0, sizeof(Energy_Data_t));
 			DPRINT("SOLAR: ERR COMMS \n\r");
@@ -108,29 +111,29 @@ void take_measurements(payloadUp_t *payload) {
 	}
 
 	/* Sensor de energía de la batería */
-	if(baterySens_status) {
+	if(baterySens_config) {
 		if(INA219_init(INA219_BATERY) == ENERGY_OK) {
-			baterySens_status = false;
+			baterySens_config = false;
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una medición
 			DPRINT("BATERY: CONFIG \n\r");
 		}
 		else {
-			baterySens_status = true; // Ya era true, pero por las dudas
+			baterySens_config = true; // Ya era true, pero por las dudas
 			payload->baterySens_status = true;
 			memset(&(payload->batery), 0, sizeof(Energy_Data_t));
 			DPRINT("BATERY: ERR COMMS \n\r");
 		}
 	}
-	if(!baterySens_status) {
+	if(!baterySens_config) {
 		Energy_Data_t batery_temp;
 		if(INA219_getVoltageAndCurrent(INA219_BATERY, &batery_temp) == ENERGY_OK) {
-			baterySens_status = false; // Ya era false, pero por las dudas
+			baterySens_config = false; // Ya era false, pero por las dudas
 			payload->baterySens_status = false;
 			payload->batery = batery_temp;
 			DPRINT("BATERY: %d mV - %d mA \n\r", batery_temp.voltage_mV, batery_temp.current_mA);
 		}
 		else {
-			baterySens_status = true;
+			baterySens_config = true;
 			payload->baterySens_status = true;
 			memset(&(payload->batery), 0, sizeof(Energy_Data_t));
 			DPRINT("BATERY: ERR COMMS \n\r");
@@ -138,21 +141,21 @@ void take_measurements(payloadUp_t *payload) {
 	}
 
 	/* Sensor de energía de la linterna */
-	if(lanternSens_status) {
+	if(lanternSens_config) {
 		if(INA219_init(INA219_LANTERN) == ENERGY_OK) {
-			lanternSens_status = false;
+			lanternSens_config = false;
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una medición
 			DPRINT("LANTERN: CONFIG \n\r");
 		}
 		else {
-			lanternSens_status = true; // Ya era true, pero por las dudas
+			lanternSens_config = true; // Ya era true, pero por las dudas
 			payload->lanternSens_status = true;
 			payload->lantern_failure = false; // No puedo confirmar que tenga error
 			payload->flasher_failure = false; // No puedo confirmar que tenga error
 			DPRINT("LANTERN: ERR COMMS \n\r");
 		}
 	}
-	if(!lanternSens_status) {
+	if(!lanternSens_config) {
 		int16_t current_mA;
 		Energy_Status_t Energy_Status;
 		Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, LANTERN_MIN_MV);
@@ -165,7 +168,7 @@ void take_measurements(payloadUp_t *payload) {
 			}
 		}
 		if(Energy_Status == ENERGY_OK) {
-			lanternSens_status = false; // Ya era false, pero por las dudas
+			lanternSens_config = false; // Ya era false, pero por las dudas
 			payload->lanternSens_status = false;
 			payload->flasher_failure = false;
 
@@ -179,7 +182,7 @@ void take_measurements(payloadUp_t *payload) {
 			}
 		}
 		else if(Energy_Status == ENERGY_ERR_COMMS) {
-			lanternSens_status = true;
+			lanternSens_config = true;
 			payload->lanternSens_status = true;
 			payload->lantern_failure = false;	// No puedo confirmar que tenga error
 			payload->flasher_failure = false; 	// No puedo confirmar que tenga error
@@ -187,7 +190,7 @@ void take_measurements(payloadUp_t *payload) {
 		}
 		else if(Energy_Status == ENERGY_ERR_BAD_TIMING) {
 			/* No se logró medir una tensión superior a LANTERN_MIN_MV dentro del periodo LANTERN_PERIOD_MS especificado */
-			lanternSens_status = false;
+			lanternSens_config = false;
 			payload->lanternSens_status = false;
 			payload->lantern_failure = false;
 			payload->flasher_failure = true; // Falló el destellador
@@ -231,6 +234,13 @@ void take_measurements(payloadUp_t *payload) {
 			break;
 	}
 
+	/* Periodo de Tx */
+	payload->tx_period_min = tx_period_min;
+
+	/* Bandera de reinicio efectuado */
+	payload->system_rebooted = system_rebooted ? 1 : 0;
+	system_rebooted = false;
+
 	/* Bandera de IMPACTO */
 	Acel_Status_t Impact_Status;
 	if(ADXL345_getImpactEv(&Impact_Status)) {
@@ -249,18 +259,18 @@ void take_measurements(payloadUp_t *payload) {
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una lectura
 			ADXL345_getImpactEv(&Impact_Status);
 			if(Impact_Status == ACEL_OK) {
-				acel_status = false; // Se pudo limpiar la bandera de Activity con exito
+				acel_config = false; // Se pudo limpiar la bandera de Activity con exito
 				DPRINT("ACEL: ERR COMMS. FLAG CLEAR \n\r");
 			}
 			else {
-				acel_status = true;	// No se pudo limpiar la bandera de Activity
+				acel_config = true;	// No se pudo limpiar la bandera de Activity
 				payload->acel_status = true;
 				payload->tilt = 0; // No puedo enviar un dato que, aunque válido, contradiga el estado de falla del acelerómetro
 			}
 		}
 		else {	// No se pudo configurar el acelerómetro
 			DPRINT("ACEL: ERR COMMS. RECONFIG FAIL \n\r");
-			acel_status = true;
+			acel_config = true;
 			payload->acel_status = true;
 			payload->tilt = 0; // No puedo enviar un dato que, aunque válido, contradiga el estado de falla del acelerómetro
 		}
@@ -317,12 +327,12 @@ void transmit_data(payloadUp_t *payload) {
 		else if(LoRaWAN_Status == LORA_DOWN_AVAILABLE) {
 			if(downlink.available){
 				DPRINT("LORAWAN: PAYLOAD RECIBIDO EN EL DOWNLINK \n\r");
-				if(payloadDown->tx_period_s > 0) {
+				if(payloadDown->tx_period_min > 0) {
 					DPRINT("LORAWAN: COMANDO PARA EL AJUSTE DEL PERIODO DE TX \n\r");
-					tx_period_s = (uint32_t)payloadDown->tx_period_s;
+					tx_period_min = (uint32_t)payloadDown->tx_period_min;
 				}
 				if(payloadDown->system_reboot) {
-				    system_reboot = true;
+					system_reboot = true;
 				}
 			}
 		}
@@ -346,7 +356,7 @@ void goto_sleep(void) {
 	DPRINT("------------------------------ \n\r");	/* Separador de paquetes en consola */
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	lorawan_sleep();
-	SystemPower_sleep(tx_period_s);
+	SystemPower_sleep(tx_period_min);
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	DPRINT("WAKE UP \n\r");
 }

@@ -15,7 +15,7 @@ extern "C" {
 #include "main.h"
 #include <stdbool.h>
 
-void SystemPower_sleep(uint32_t seconds);
+void SystemPower_sleep(uint32_t minuts);
 void RTC_notifyTimeOut(void);
 bool RTC_getTimeOutEv(void);
 

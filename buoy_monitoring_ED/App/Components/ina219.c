@@ -31,13 +31,13 @@
  *   [14]    —        = 0   	(reservado)
  *   [13]    BRNG     = 1   	(bus voltage range: 32V (26V máx admisible por hardware)
  *   [12:11] PG[1:0]  = 11  	(ganancia shunt: ±320 mV)
- *   [10:7]  BADC     = 1111 	(bus ADC:   128 muestras promediadas)
- *   [6:3]   SADC     = 1111 	(shunt ADC: 128 muestras promediadas)
+ *   [10:7]  BADC     = 1110 	(bus ADC:   64 muestras promediadas)
+ *   [6:3]   SADC     = 1110 	(shunt ADC: 64 muestras promediadas)
  *   [2:0]   MODE     = 111  	(shunt + bus, continuo)
  *
- *   Valor: 0b0011_1111_1111_1111 = 0x3FFF
+ *   Valor: 0b0011_1111_0111_0111 = 0x3F77
  * =========================================================================*/
-#define CFG_CONFIGURATION   0x3FFF
+#define CFG_CONFIGURATION   0x3F77
 
 /* Máscaras */
 #define MASK_BUS_VOLTAGE_SHIFT  3
@@ -95,14 +95,14 @@ Energy_Status_t INA219_detectAndMeasure(INA219_Channel ch, int16_t *current_mA, 
     	return ENERGY_ERR_COMMS;
     }
 
-    HAL_Delay(150);	// Le toma 136ms obtener 2 mediciones nuevas (cada promedio de 120 muestras le toma 68,1 ms)
+    HAL_Delay(75);	// Le toma 68,1ms obtener 2 mediciones nuevas (cada promedio de 60 muestras le toma 34,05 ms)
 
     // Medición de corriente
     if(INA219_getCurrent(ch, &i_mA) == ENERGY_ERR_COMMS) {
     	return ENERGY_ERR_COMMS;
     }
 
-    HAL_Delay(150); // Le toma 136ms obtener 2 mediciones nuevas (cada promedio de 120 muestras le toma 68,1 ms)
+    HAL_Delay(75); // Le toma 68,1ms obtener 2 mediciones nuevas (cada promedio de 60 muestras le toma 34,05 ms)
 
     // Segunda medición de tensión
     if(INA219_getVoltage(ch, &v2_mV) == ENERGY_ERR_COMMS) {
