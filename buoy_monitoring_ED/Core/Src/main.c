@@ -13,6 +13,7 @@
 #include "rtc.h"
 #include "buoy_app.h"
 #include "system_clock.h"
+#include "parameters.h"
 
 uint8_t is_boot_retry = 0;
 
@@ -30,6 +31,7 @@ int main(void) {
 
     is_boot_retry = 0;	// Si se llegó a este punto sin errores de inicialización, se reinicia la bandera
 
+    parameters_init();
     buoyApp_init();
 
     while(1) {

@@ -1,6 +1,6 @@
 #include "main.h"
 #include "stm32l4xx_it.h"
-#include "rtc.h"	// TOMI2: antes tenía la variable hrtc declarada como extern. Ver su funciona así
+#include "rtc.h"
 
 /******************************************************************************/
 /*           Cortex-M4 Processor Interruption and Exception Handlers          */

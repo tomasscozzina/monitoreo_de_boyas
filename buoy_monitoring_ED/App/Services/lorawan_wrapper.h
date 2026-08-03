@@ -18,12 +18,6 @@ extern "C"
 		LORA_ERR_COMMS,			/* La comunicación con el Network Server (NS) falló */
 	} LoRaWAN_Status_t;
 
-	typedef struct {
-		uint64_t joinEUI;
-		uint64_t deviceEUI;
-		uint8_t appKey[16];
-	} lorawan_credentials_t;
-
     typedef struct {
         const void *payload;    /* Puntero genérico (acepta cualquier tipo de dato) */
         uint8_t len;			/* Tamaño del payload, en bytes */
@@ -37,7 +31,7 @@ extern "C"
         uint8_t data[242];		/* Arreglo de RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE bytes para la recepción del Dowlink */
     } lorawan_downlink_t;
 
-    LoRaWAN_Status_t lorawan_init(lorawan_credentials_t* credentials);
+    LoRaWAN_Status_t lorawan_init(uint64_t joinEUI, uint64_t deviceEUI, uint8_t* appKey);
     LoRaWAN_Status_t lorawan_sendReceive(lorawan_uplink_t *uplink, lorawan_downlink_t *downlink);
     void lorawan_setADR(bool enable);
     void lorawan_setDataRate(uint8_t dr);

@@ -127,10 +127,10 @@ extern "C" {
 	void lorawan_radioBegin(void);
 
 	/* API pública */
-	LoRaWAN_Status_t lorawan_init(lorawan_credentials_t* credentials) {
+	LoRaWAN_Status_t lorawan_init(uint64_t joinEUI, uint64_t deviceEUI, uint8_t* appKey) {
 		LoRaWAN_Status_t ret;
 		lorawan_radioBegin();
-	    node.beginOTAA(credentials->joinEUI, credentials->deviceEUI, nullptr, credentials->appKey);
+	    node.beginOTAA(joinEUI, deviceEUI, nullptr, appKey);
 	    flash_restore(&node);
 
 	    int16_t state;

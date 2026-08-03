@@ -25,7 +25,7 @@
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;	// Módulo GPS
-UART_HandleTypeDef huart2;	// Puerto SERIE
+UART_HandleTypeDef huart2;	// ST-Link
 
 /* USART1 init function */
 void MX_USART1_UART_Init(void)

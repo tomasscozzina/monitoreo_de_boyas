@@ -5,18 +5,12 @@
  * @brief   Aplicación principal para el monitoreo de boyas
  ******************************************************************************/
 #include "buoy_app.h"
+#include "parameters.h"
 #include <string.h>
 
 #define LORAWAN_CONFIRMED_RETRIES 10
 
 bool system_rebooted = false;
-uint32_t tx_period_min = TX_PERIOD_MIN;
-
-lorawan_credentials_t credentials = {
-    .joinEUI   = LORAWAN_JOIN_EUI,
-    .deviceEUI = LORAWAN_DEVICE_EUI,
-    .appKey    = LORAWAN_APP_KEY
-};
 
 /* Prototipos de funciones privadas */
 void take_measurements(payloadUp_t *payload);
@@ -26,8 +20,7 @@ void goto_sleep(void);
 /* Definiciones de funciones públicas */
 void buoyApp_init(void) {
 	DPRINT("INICIANDO EL SISTEMA ... \n\r");
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-	while(lorawan_init(&credentials) != LORA_JOIN_OK) {
+	while(lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey)) {
 		DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
 		goto_sleep();
 	}
@@ -52,7 +45,7 @@ void take_measurements(payloadUp_t *payload) {
 
 	/* Acelerómetro */
 	if(acel_config) {
-		if(ADXL345_init(IMPACT_THRESHOLD) == ACEL_OK) {
+		if(ADXL345_init(parameters.impactThreshold) == ACEL_OK) {
 			acel_config = false;
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una medición
 			DPRINT("ACEL: CONFIG \n\r");
@@ -158,12 +151,12 @@ void take_measurements(payloadUp_t *payload) {
 	if(!lanternSens_config) {
 		int16_t current_mA;
 		Energy_Status_t Energy_Status;
-		Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, LANTERN_MIN_MV);
+		Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
 
 		uint32_t start = HAL_GetTick();
 		while(Energy_Status == ENERGY_ERR_BAD_TIMING) {
-			Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, LANTERN_MIN_MV);
-			if(HAL_GetTick() - start > LANTERN_PERIOD_MS) {
+			Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
+			if(HAL_GetTick() - start > (parameters.lanternPeriod_s * 1000)) {
 				break;
 			}
 		}
@@ -172,7 +165,7 @@ void take_measurements(payloadUp_t *payload) {
 			payload->lanternSens_status = false;
 			payload->flasher_failure = false;
 
-			if(current_mA < LANTERN_MIN_MA) {
+			if(current_mA < parameters.lanternMin_mA) {
 				payload->lantern_failure = true; // La corriente por la linterna es menor a la mínima aceptable
 				DPRINT("LANTERN: LANTERN FAILURE \n\r");
 			}
@@ -189,7 +182,7 @@ void take_measurements(payloadUp_t *payload) {
 			DPRINT("LANTERN: ERR COMMS \n\r");
 		}
 		else if(Energy_Status == ENERGY_ERR_BAD_TIMING) {
-			/* No se logró medir una tensión superior a LANTERN_MIN_MV dentro del periodo LANTERN_PERIOD_MS especificado */
+			/* No se logró medir una tensión superior a lanternMin_mV dentro del periodo LANTERN_PERIOD_MS especificado */
 			lanternSens_config = false;
 			payload->lanternSens_status = false;
 			payload->lantern_failure = false;
@@ -207,7 +200,7 @@ void take_measurements(payloadUp_t *payload) {
 	while(GPS_Status == GPS_ERR_NO_FIX || GPS_Status == GPS_ERR_ANTENNA) {
 		HAL_Delay(1000); // El periodo de actualización del GPS es de 1 Hz
 		GPS_Status = GPS_getData(&GPS_Data);
-		if(HAL_GetTick() - start > GPS_TIMECAP_MS) {
+		if(HAL_GetTick() - start > (parameters.gpsTimecap_s * 1000)) {
 			break;
 		}
 	}
@@ -235,7 +228,7 @@ void take_measurements(payloadUp_t *payload) {
 	}
 
 	/* Periodo de Tx */
-	payload->tx_period_min = tx_period_min;
+	payload->tx_period_min = parameters.txPeriod_min;
 
 	/* Bandera de reinicio efectuado */
 	payload->system_rebooted = system_rebooted ? 1 : 0;
@@ -254,7 +247,7 @@ void take_measurements(payloadUp_t *payload) {
 	if (Impact_Status == ACEL_ERR_COMMS) {
 		DPRINT("ACEL: ERR COMMS. RECONFIG \n\r");
 		/* Vuelvo a configurar el acelerómetro, para intentar solucionar el problema y por ende, limpiar la bandera de Activity (Impacto) */
-		if(ADXL345_init(IMPACT_THRESHOLD) == ACEL_OK) {  // Se pudo configurar el acelerómetro con éxito
+		if(ADXL345_init(parameters.impactThreshold) == ACEL_OK) {  // Se pudo configurar el acelerómetro con éxito
 			DPRINT("ACEL: ERR COMMS. RECONFIG OK \n\r");
 			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una lectura
 			ADXL345_getImpactEv(&Impact_Status);
@@ -308,7 +301,7 @@ void transmit_data(payloadUp_t *payload) {
 
 	uplink.payload = payload;
 	uplink.len = sizeof(payloadUp_t);
-	uplink.port = LORAWAN_PORT;
+	uplink.port = parameters.port;
 	uplink.confirmed = confirmed;
 
 	LoRaWAN_Status_t LoRaWAN_Status;
@@ -318,7 +311,7 @@ void transmit_data(payloadUp_t *payload) {
 		LoRaWAN_Status = lorawan_sendReceive(&uplink, &downlink);
 		if(LoRaWAN_Status == LORA_ERR_COMMS) {
 			DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL UPLINK. REINICIANDO EL JOIN \n\r");
-			if(lorawan_init(&credentials) == LORA_ERR_COMMS) {
+			if(lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey) == LORA_ERR_COMMS) {
 				DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL JOIN. REINICIANDO EL SISTEMA \n\r");
 				Error_Handler();
 			}
@@ -329,7 +322,8 @@ void transmit_data(payloadUp_t *payload) {
 				DPRINT("LORAWAN: PAYLOAD RECIBIDO EN EL DOWNLINK \n\r");
 				if(payloadDown->tx_period_min > 0) {
 					DPRINT("LORAWAN: COMANDO PARA EL AJUSTE DEL PERIODO DE TX \n\r");
-					tx_period_min = (uint32_t)payloadDown->tx_period_min;
+					parameters.txPeriod_min = (uint32_t)payloadDown->tx_period_min;
+					parameters_save(&parameters);
 				}
 				if(payloadDown->system_reboot) {
 					system_reboot = true;
@@ -356,7 +350,7 @@ void goto_sleep(void) {
 	DPRINT("------------------------------ \n\r");	/* Separador de paquetes en consola */
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	lorawan_sleep();
-	SystemPower_sleep(tx_period_min);
+	SystemPower_sleep(parameters.txPeriod_min);
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	DPRINT("WAKE UP \n\r");
 }

@@ -4,7 +4,6 @@
  * @date    23 jun 2026
  * @brief   Driver del sensor de energía INA219 de Texas Instruments
  ******************************************************************************/
-
 #include "ina219.h"
 #include <stdbool.h>
 

@@ -5,7 +5,6 @@
  * @brief   [Breve descripción]
  ******************************************************************************/
 
-// TOMI2: Podría crear funciones SET para habilitar y deshabilitar IRQs que no necesito que despierten al micro
 #include "interrups.h"
 #include "main.h"
 #include "sw1.h"
