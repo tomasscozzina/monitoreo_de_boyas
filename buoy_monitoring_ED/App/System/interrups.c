@@ -5,7 +5,6 @@
  * @brief   [Breve descripción]
  ******************************************************************************/
 
-#include "interrups.h"
 #include "main.h"
 #include "sw1.h"
 #include "adxl345.h"
