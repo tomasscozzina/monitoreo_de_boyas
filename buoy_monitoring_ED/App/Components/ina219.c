@@ -111,6 +111,10 @@ Energy_Status_t INA219_detectAndMeasure(INA219_Channel ch, int16_t *current_mA, 
     bool v1_on = (v1_mV >= min_voltage_mV);
     bool v2_on = (v2_mV >= min_voltage_mV);
 
+//    DPRINT("v1 = %d mV \n\r", v1_mV);
+//    DPRINT("v2 = %d mV \n\r", v2_mV);
+//    DPRINT("i = %d mA \n\r", i_mA);
+
     /* Si alguna de las dos mediciones de tensión (o ambas) no superan el mínimo, es porque justo se estaba dando
      * una transición en el estado de la linterna (ON a OFF o viceversa) o porque la linterna se encontraba apagada */
     if (!v1_on || !v2_on) {

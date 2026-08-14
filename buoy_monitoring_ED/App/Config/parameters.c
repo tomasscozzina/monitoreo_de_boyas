@@ -26,11 +26,11 @@ static void led_update_pattern(uint32_t elapsed_ms) {
 }
 
 void parameters_init(void) {
-    printf("[CFG] Esperando parametros por UART2 (30s)...\r\n");
+    DPRINT("CONFIG: Esperando carga de parámetros (30s) \r\n");
 
     // Escuchar por UART2 durante 30 segundos
     if (parameters_receive(30000)) {
-        printf("[CFG] Parametros recibidos y guardados con exito.\r\n");
+    	DPRINT("CONFIG: Parámetros recibidos y cargados con éxito \r\n");
         HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
         HAL_Delay(2000);
         return;
@@ -38,18 +38,18 @@ void parameters_init(void) {
 
     // Intentar cargar desde Flash
     if (parameters_load()) {
-        printf("[CFG] Parametros cargados correctamente desde Flash NVM.\r\n");
+    	DPRINT("CONFIG: No se recibieron parámetros. Cargando parámetros desde flash \r\n");
         HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
         HAL_Delay(2000);
         return;
     }
 
     // Esperar indefinidamente con titilado constante de 1 segundo
-    printf("[CFG] ERROR: Sin datos en Flash. Esperando configuracion indefinidamente...\r\n");
+    DPRINT("CONFIG: No se recibieron parámetros y no hay parámetros en flash. Esperando carga de parámetros indefinidamente \r\n");
     while (1) {
         // Ejecuta en bloques de 10s con timeout de 10000ms para mantener el loop activo
         if (parameters_receive(10000)) {
-            printf("[CFG] Parametros iniciales recibidos. Continuando arranque...\r\n");
+        	DPRINT("CONFIG: Parámetros recibidos. Continuando inicialización \r\n");
             HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
             HAL_Delay(2000);
             return;
