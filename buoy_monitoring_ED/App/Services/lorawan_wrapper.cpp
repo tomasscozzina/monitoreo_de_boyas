@@ -124,12 +124,15 @@ extern "C" {
 	/* Prototipos de funciones privadas */
 	void flash_restore(LoRaWANNode *node);
 	void flash_save(LoRaWANNode *node);
-	void lorawan_radioBegin(void);
+	bool lorawan_radioBegin(void);
 
 	/* API pública */
 	LoRaWAN_Status_t lorawan_init(uint64_t joinEUI, uint64_t deviceEUI, uint8_t* appKey) {
 		LoRaWAN_Status_t ret;
-		lorawan_radioBegin();
+
+		if(lorawan_radioBegin()) {
+			return LORA_ERR_COMMS;
+		}
 	    node.beginOTAA(joinEUI, deviceEUI, nullptr, appKey);
 	    flash_restore(&node);
 
@@ -145,7 +148,7 @@ extern "C" {
 	    /* Independientemente de si el JOIN es exitoso o no, se debe guardar en memoria los nonces actualizados */
 	    flash_save(&node);
 
-	    ret = (state == RADIOLIB_LORAWAN_NEW_SESSION) ? LORA_JOIN_OK : LORA_ERR_COMMS;
+	    ret = (state == RADIOLIB_LORAWAN_NEW_SESSION) ? LORA_JOIN_OK : LORA_ERR_JOIN;
 	    return ret;
 	}
 
@@ -157,34 +160,45 @@ extern "C" {
 		int16_t state = 0;
 		for(uint8_t i = 0; i < LORAWAN_UPLINK_REINTENTOS; i++) {
 			state = node.sendReceive((const uint8_t *) uplink->payload, (size_t) uplink->len, uplink->port, downlink->data, &downlink_len, uplink->confirmed, &evUp, &evDown);
-			/* Si la transmisión del Uplink falla, se reintenta LORAWAN_UPLINK_REINTENTOS veces */
-			if(state >= 0) {
-				break;
-			}
-			HAL_Delay(5000);
+		   /* No hay sesión activa: se requiere una nueva activación */
+		   if(state == RADIOLIB_ERR_NETWORK_NOT_JOINED) {
+			   memset(downlink, 0, sizeof(lorawan_downlink_t));
+			   return LORA_ERR_JOIN;
+		   }
+		   /* El Uplink se transmitió, pero el Downlink recibido no es válido: se descarta */
+		   if((state == RADIOLIB_ERR_DOWNLINK_MALFORMED) || (state == RADIOLIB_ERR_INVALID_PORT) || (state == RADIOLIB_ERR_MIC_MISMATCH)) {
+			   memset(downlink, 0, sizeof(lorawan_downlink_t));
+			   return LORA_UP_OK;
+		   }
+		   /* El Uplink se transmitió, y se recibió o no Downlink */
+		   if(state >= 0) {
+			   break;
+		   }
+		   /* El Uplink no se transmitió por un error del transceptor */
+		   HAL_Delay(5000);
 		}
 
-		LoRaWAN_Status_t ret;
 		if((state == 1) || (state == 2)) {
-			/* Se envió Uplink y se recibió Dowlink en Rx1 o Rx2, según 'state' */
+			/* Se envió Uplink y se recibió Downlink en Rx1 o Rx2, según 'state' */
 			if(downlink_len == DOWNLINK_PAYLOAD_LEN) {
-				/* El Dowlink recibido contiene payload del tamaño esperado */
+				/* El Downlink recibido contiene payload del tamaño esperado */
 				downlink->available = true;
 			}
 			else {
-				/* El Dowlink recibido NO contiene payload o tiene un tamaño distinto al esperado */
+				/* El Downlink recibido NO contiene payload o tiene un tamaño distinto al esperado */
 				memset(downlink, 0, sizeof(lorawan_downlink_t));
 			}
-			/* Contenga o no payload, se evalua la flag confirming */
+			/* Contenga o no payload, se evalúa la flag confirming */
 			downlink->confirming = evDown.confirming;
-			ret = LORA_DOWN_AVAILABLE;
+			return LORA_DOWN_AVAILABLE;
 		}
-		else {
-			/* Se envió Uplink y NO se recibió Dowlink, o se produjo un error en la comunicación */
-			memset(downlink, 0, sizeof(lorawan_downlink_t));
-			ret = (state == RADIOLIB_ERR_NONE) ? LORA_UP_OK : LORA_ERR_COMMS;
+
+		/* Se envió Uplink y NO se recibió Downlink, o falló la comunicación con el transceptor */
+		memset(downlink, 0, sizeof(lorawan_downlink_t));
+		if(state == RADIOLIB_ERR_NONE) {
+			return LORA_UP_OK;
 		}
-		return ret;
+		return LORA_ERR_COMMS;
 	}
 
 	void lorawan_sleep(void) {
@@ -213,11 +227,11 @@ extern "C" {
 	}
 
 	/* Definiciones de funciones privadas */
-	void lorawan_radioBegin(void) {
+	bool lorawan_radioBegin(void) {
 		for (uint8_t i = 0; i < LORAWAN_COMMS_REINTENTOS; i++) {
-			/* Inicializo el módulo con parámetros pertenecientes a la sub-banda 2 de AU915 */
+			/* Inicializo el módulo con parámetros pertenecientes a AU915 */
 			if(radio.begin(915.2, 125.0, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN) == RADIOLIB_ERR_NONE) {
-				return;
+				return false;
 			}
 			HAL_Delay(100);
 			DPRINT("PRIMER REINTENTO BEGIN N° %d \n\r", i);
@@ -228,15 +242,15 @@ extern "C" {
 
 		// Se repiten los 5 intentos
 		for (uint8_t i = 0; i < LORAWAN_COMMS_REINTENTOS; i++) {
-			/* Inicializo el módulo con parámetros pertenecientes a la sub-banda 2 de AU915 */
+			/* Inicializo el módulo con parámetros pertenecientes a AU915 */
 			if(radio.begin(915.2, 125.0, 9, 7, RADIOLIB_SX127X_SYNC_WORD_LORAWAN) == RADIOLIB_ERR_NONE) {
-				return;
+				return false;
 			}
 			HAL_Delay(100);
 			DPRINT("SEGUNDO REINTENTO BEGIN N° %d \n\r", i);
 		}
-		// Luego de los 10 intentos fallidos (habiendo reiniciado la interfaz de por medio) se llama al Error_Handler() para reiniciar el sistema
-		Error_Handler();
+		// Luego de los 10 intentos fallidos (habiendo reiniciado la interfaz de por medio) se retorna TRUE para indicar una falla en las comunicaciones con el módulo
+		return true;
 	}
 
 	void flash_restore(LoRaWANNode *node) {

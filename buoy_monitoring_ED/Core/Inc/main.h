@@ -16,21 +16,12 @@ extern "C" {
 #include <stdio.h>
 
 /****************************************************************************************************/
-#ifdef DEBUG
-	// En modo DEBUG, se habilitan las siguientes definiciones
-	#define COMMENTS
-#endif
-
-#ifdef COMMENTS
-	// Defino DPRINT para imprimir por consola con el formato "[TIME] LOG"
-	#define DPRINT(fmt, ...) \
-		do { \
-			uint32_t tick = HAL_GetTick(); \
-			printf("[%04lu.%03lu] " fmt, tick / 1000, tick % 1000, ##__VA_ARGS__); \
-		} while (0)
-#else
-  	  #define DPRINT(...)
-#endif
+/* Definición de la macro DPRINT, para salidas por consola con timestamp */
+#define DPRINT(fmt, ...) \
+	do { \
+		uint32_t tick = HAL_GetTick(); \
+		printf("[%04lu.%03lu] " fmt, tick / 1000, tick % 1000, ##__VA_ARGS__); \
+	} while (0)
 /****************************************************************************************************/
 
 #define RFM95W_MISO_Pin 		GPIO_PIN_4

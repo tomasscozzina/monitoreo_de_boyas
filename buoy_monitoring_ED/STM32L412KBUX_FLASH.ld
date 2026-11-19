@@ -49,7 +49,7 @@ MEMORY
   RAM2         (xrw) : ORIGIN = 0x10000000, LENGTH = 8K
   FLASH        (rx)  : ORIGIN = 0x08000000, LENGTH = 124K
   FLASH_PARAMS (r)   : ORIGIN = 0x0801F000, LENGTH = 2K   /* Página 62 */
-  FLASH_NVM    (r)   : ORIGIN = 0x0801F800, LENGTH = 2K   /* Página 63 */
+  FLASH_NONCES (r)   : ORIGIN = 0x0801F800, LENGTH = 2K   /* Página 63 */
 }
 
 /* Sections */

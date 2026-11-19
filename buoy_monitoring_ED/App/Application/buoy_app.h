@@ -28,11 +28,11 @@ typedef struct __attribute__((packed)) {
 	Energy_Data_t batery;			 /* 4  bytes */
 	uint8_t tx_period_min;		 	 /* 1  bytes */
 	/* Flags */						 /* 2  bytes */
-	uint16_t gps_status 		:2;	 /* 0 = GPS_OK - 1 = GPS_ERR_COMMS - 2 = GPS_ERR_NO_FIX - 3 = GPS_ERR_ANTENNA */
-	uint16_t acel_status		:1;	 /* 0 = ACEL_OK - 1 = ACEL_ERR_COMMS */
-	uint16_t solarSens_status 	:1;	 /* 0 = ENERGY_OK - 1 = ENERGY_ERR_COMMS */
-	uint16_t baterySens_status 	:1;	 /* 0 = ENERGY_OK - 1 = ENERGY_ERR_COMMS */
-	uint16_t lanternSens_status :1;	 /* 0 = ENERGY_OK - 1 = ENERGY_ERR_COMMS */
+	uint16_t gps_status 		:2;	 /* 0 = OK - 1 = ERR_COMMS - 2 = ERR_NO_FIX - 3 = ERR_ANTENNA */
+	uint16_t acel_status		:1;	 /* 0 = OK - 1 = ERR_COMMS */
+	uint16_t solarSens_status 	:1;	 /* 0 = OK - 1 = ERR_COMMS */
+	uint16_t baterySens_status 	:1;	 /* 0 = OK - 1 = ERR_COMMS */
+	uint16_t lanternSens_status :1;	 /* 0 = OK - 1 = ERR_COMMS */
 	uint16_t periodic_TX		:1;	 /* 0 = NO_PERIODIC_TX - 1 = PERIODIC_TX */
 	uint16_t gps_set			:1;	 /* 0 = NO_SET - 1 = SET */
 	uint16_t impact				:1;	 /* 0 = NO_IMPACT - 1 = IMPACT */
@@ -42,7 +42,7 @@ typedef struct __attribute__((packed)) {
 	uint16_t padding			:4;	 /* RESERVED BITS */
 }payloadUp_t;
 
-/* Tamaño del payload del Downlink: 2 bytes */
+/* Tamaño del payload del Downlink: 1 byte */
 typedef struct __attribute__((packed)) {
 	uint8_t system_reboot		:1;  /* 0 = NO_REBOOT - 1 = REBOOT */
 	uint8_t tx_period_min		:7;  /* Periodo de Tx en minutos (0 - 127) */

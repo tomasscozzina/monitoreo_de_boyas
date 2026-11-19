@@ -19,10 +19,18 @@ void goto_sleep(void);
 
 /* Definiciones de funciones públicas */
 void buoyApp_init(void) {
+	LoRaWAN_Status_t ret;
 	DPRINT("INICIANDO EL SISTEMA ... \n\r");
-	while(lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey)) {
-		DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
+	ret = lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey);
+	while(ret != LORA_JOIN_OK) {
+		if (ret == LORA_ERR_JOIN){
+			DPRINT("JOIN FALLÓ, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
+		}
+		else {
+			DPRINT("ERROR EN LA COMUNICACIÓN CON EL TRANSCEPTOR, SE INTENTARÁ NUEVAMENTE EN EL PRÓXIMO CICLO \n\r");
+		}
 		goto_sleep();
+		ret = lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey);
 	}
 	lorawan_sleep();
 	system_rebooted = true;
@@ -42,6 +50,9 @@ void take_measurements(payloadUp_t *payload) {
 	static bool solarSens_config = true;
 	static bool baterySens_config = true;
 	static bool lanternSens_config = true;
+
+	static bool lanternFailure_last = false;	// Último resultado nocturno de la linterna (se informa durante el día)
+	static bool flasherFailure_last = false;	// Último resultado nocturno del destellador (se informa durante el día)
 
 	/* Acelerómetro */
 	if(acel_config) {
@@ -149,45 +160,76 @@ void take_measurements(payloadUp_t *payload) {
 		}
 	}
 	if(!lanternSens_config) {
-		int16_t current_mA;
-		Energy_Status_t Energy_Status;
-		Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
+		/* Es de día si el sensor del panel solar respondió en este ciclo y su tensión alcanza el umbral.
+		 * Si el sensor del panel falló, no se puede saber, y se evalúa igual. */
+		bool daylight = (payload->solarSens_status == 0) && (payload->solarP.voltage_mV >= parameters.panelDay_mV);
 
-		uint32_t start = HAL_GetTick();
-		while(Energy_Status == ENERGY_ERR_BAD_TIMING) {
-			Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
-			if(HAL_GetTick() - start > (parameters.lanternPeriod_s * 1000)) {
-				break;
-			}
-		}
-		if(Energy_Status == ENERGY_OK) {
-			lanternSens_config = false; // Ya era false, pero por las dudas
-			payload->lanternSens_status = false;
-			payload->flasher_failure = false;
-
-			if(current_mA < parameters.lanternMin_mA) {
-				payload->lantern_failure = true; // La corriente por la linterna es menor a la mínima aceptable
-				DPRINT("LANTERN: LANTERN FAILURE \n\r");
+		if(daylight) {
+			/* De día el destellador mantiene apagada la linterna, por lo que no se evalúa.
+			 * Solo se verifica la comunicación con el sensor y se informa el último resultado nocturno. */
+			Energy_Data_t lantern_temp;
+			if(INA219_getVoltageAndCurrent(INA219_LANTERN, &lantern_temp) == ENERGY_OK) {
+				payload->lanternSens_status = false;
+				payload->lantern_failure = lanternFailure_last;
+				payload->flasher_failure = flasherFailure_last;
+				DPRINT("LANTERN: DÍA (SE INFORMA LA ÚLTIMA EVALUACIÓN NOCTURNA) \n\r");
 			}
 			else {
-				payload->lantern_failure = false; // La corriente por la linterna es mayor o igual a la mínima aceptable
-				DPRINT("LANTERN: LANTERN OK \n\r");
+				lanternSens_config = true;
+				payload->lanternSens_status = true;
+				payload->lantern_failure = false;	// No puedo confirmar que tenga error
+				payload->flasher_failure = false; 	// No puedo confirmar que tenga error
+				DPRINT("LANTERN: ERR COMMS \n\r");
 			}
 		}
-		else if(Energy_Status == ENERGY_ERR_COMMS) {
-			lanternSens_config = true;
-			payload->lanternSens_status = true;
-			payload->lantern_failure = false;	// No puedo confirmar que tenga error
-			payload->flasher_failure = false; 	// No puedo confirmar que tenga error
-			DPRINT("LANTERN: ERR COMMS \n\r");
-		}
-		else if(Energy_Status == ENERGY_ERR_BAD_TIMING) {
-			/* No se logró medir una tensión superior a lanternMin_mV dentro del periodo LANTERN_PERIOD_MS especificado */
-			lanternSens_config = false;
-			payload->lanternSens_status = false;
-			payload->lantern_failure = false;
-			payload->flasher_failure = true; // Falló el destellador
-			DPRINT("LANTERN: FLASHER FAILURE \n\r");
+		else {
+			int16_t current_mA;
+			Energy_Status_t Energy_Status;
+			Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
+
+			uint32_t start = HAL_GetTick();
+			while(Energy_Status == ENERGY_ERR_BAD_TIMING) {
+				Energy_Status = INA219_detectAndMeasure(INA219_LANTERN, &current_mA, parameters.lanternMin_mV);
+				if(HAL_GetTick() - start > (parameters.lanternPeriod_s * 1000)) {
+					break;
+				}
+			}
+			if(Energy_Status == ENERGY_OK) {
+				lanternSens_config = false; // Ya era false, pero por las dudas
+				payload->lanternSens_status = false;
+				payload->flasher_failure = false;
+
+				if(current_mA < parameters.lanternMin_mA) {
+					payload->lantern_failure = true; // La corriente por la linterna es menor a la mínima aceptable
+					DPRINT("LANTERN: LANTERN FAILURE \n\r");
+				}
+				else {
+					payload->lantern_failure = false; // La corriente por la linterna es mayor o igual a la mínima aceptable
+					DPRINT("LANTERN: LANTERN OK \n\r");
+				}
+				/* Se retiene el resultado para informarlo durante el día */
+				lanternFailure_last = payload->lantern_failure;
+				flasherFailure_last = false;
+			}
+			else if(Energy_Status == ENERGY_ERR_COMMS) {
+				/* Sin evaluación válida: se conserva el último resultado retenido */
+				lanternSens_config = true;
+				payload->lanternSens_status = true;
+				payload->lantern_failure = false;	// No puedo confirmar que tenga error
+				payload->flasher_failure = false; 	// No puedo confirmar que tenga error
+				DPRINT("LANTERN: ERR COMMS \n\r");
+			}
+			else if(Energy_Status == ENERGY_ERR_BAD_TIMING) {
+				/* No se logró medir una tensión superior a lanternMin_mV dentro del periodo LANTERN_PERIOD_MS especificado */
+				lanternSens_config = false;
+				payload->lanternSens_status = false;
+				payload->lantern_failure = false;
+				payload->flasher_failure = true; // Falló el destellador
+				DPRINT("LANTERN: FLASHER FAILURE \n\r");
+				/* Se retiene el resultado para informarlo durante el día */
+				lanternFailure_last = false;
+				flasherFailure_last = true;
+			}
 		}
 	}
 
@@ -235,7 +277,7 @@ void take_measurements(payloadUp_t *payload) {
 	system_rebooted = false;
 
 	/* Bandera de IMPACTO */
-	Acel_Status_t Impact_Status;
+	Acel_Status_t Impact_Status = ACEL_OK;
 	if(ADXL345_getImpactEv(&Impact_Status)) {
 		payload->impact = true;
 		DPRINT("IMPACTO DETECTADO \n\r");
@@ -246,26 +288,16 @@ void take_measurements(payloadUp_t *payload) {
 	}
 	if (Impact_Status == ACEL_ERR_COMMS) {
 		DPRINT("ACEL: ERR COMMS. RECONFIG \n\r");
-		/* Vuelvo a configurar el acelerómetro, para intentar solucionar el problema y por ende, limpiar la bandera de Activity (Impacto) */
-		if(ADXL345_init(parameters.impactThreshold) == ACEL_OK) {  // Se pudo configurar el acelerómetro con éxito
+		/* ADXL345_init lee INT_SOURCE, por lo que la reconfiguración también limpia la bandera de Activity */
+		if(ADXL345_init(parameters.impactThreshold) == ACEL_OK) {
 			DPRINT("ACEL: ERR COMMS. RECONFIG OK \n\r");
-			HAL_Delay(500); // Delay para la estabilización del sensor, antes de solicitar una lectura
-			ADXL345_getImpactEv(&Impact_Status);
-			if(Impact_Status == ACEL_OK) {
-				acel_config = false; // Se pudo limpiar la bandera de Activity con exito
-				DPRINT("ACEL: ERR COMMS. FLAG CLEAR \n\r");
-			}
-			else {
-				acel_config = true;	// No se pudo limpiar la bandera de Activity
-				payload->acel_status = true;
-				payload->tilt = 0; // No puedo enviar un dato que, aunque válido, contradiga el estado de falla del acelerómetro
-			}
+			acel_config = false;
 		}
-		else {	// No se pudo configurar el acelerómetro
+		else {
 			DPRINT("ACEL: ERR COMMS. RECONFIG FAIL \n\r");
 			acel_config = true;
 			payload->acel_status = true;
-			payload->tilt = 0; // No puedo enviar un dato que, aunque válido, contradiga el estado de falla del acelerómetro
+			payload->tilt = 0;
 		}
 	} // Cualquiera de los 2 casos de falla (en configuración y en el clear de la bandera), se reintentará corregir en el proximo ciclo
 
@@ -297,27 +329,32 @@ void transmit_data(payloadUp_t *payload) {
 	payloadDown_t *payloadDown = (payloadDown_t*) downlink.data;
 
 	bool system_reboot = false;
-	bool confirmed = (payload->gps_set || payload->impact);
 
 	uplink.payload = payload;
 	uplink.len = sizeof(payloadUp_t);
 	uplink.port = parameters.port;
-	uplink.confirmed = confirmed;
+	uplink.confirmed = (payload->gps_set || payload->impact);
 
 	LoRaWAN_Status_t LoRaWAN_Status;
-	uint8_t retries = LORAWAN_CONFIRMED_RETRIES;
+	uint8_t retries = 0;
+	if(uplink.confirmed) {
+		retries = LORAWAN_CONFIRMED_RETRIES;
+	}
+
 	do {
 		DPRINT("LORAWAN: SEND \n\r");
 		LoRaWAN_Status = lorawan_sendReceive(&uplink, &downlink);
-		if(LoRaWAN_Status == LORA_ERR_COMMS) {
-			DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL UPLINK. REINICIANDO EL JOIN \n\r");
-			if(lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey) == LORA_ERR_COMMS) {
-				DPRINT("LORAWAN: SE PRODUJERON ERRORES EN EL JOIN. REINICIANDO EL SISTEMA \n\r");
-				Error_Handler();
-			}
-			DPRINT("LORAWAN: JOIN OK \n\r");
-		}
+		if((LoRaWAN_Status == LORA_ERR_COMMS) || (LoRaWAN_Status == LORA_ERR_JOIN)) {
+		   DPRINT("LORAWAN: FALLÓ EL UPLINK. REINICIANDO EL JOIN \n\r");
+		   if(lorawan_init(parameters.joinEUI, parameters.deviceEUI, parameters.appKey) != LORA_JOIN_OK) {
+			   DPRINT("LORAWAN: FALLÓ EL JOIN. REINICIANDO EL SISTEMA \n\r");
+			   Error_Handler();
+		   }
+		   DPRINT("LORAWAN: JOIN OK \n\r");
+	   }
+		/* Si se reciibió downlink */
 		else if(LoRaWAN_Status == LORA_DOWN_AVAILABLE) {
+			/* Si el downlink recibido tiene payload verificado */
 			if(downlink.available){
 				DPRINT("LORAWAN: PAYLOAD RECIBIDO EN EL DOWNLINK \n\r");
 				if(payloadDown->tx_period_min > 0) {
@@ -332,12 +369,12 @@ void transmit_data(payloadUp_t *payload) {
 		}
 		/* Si el Uplink era confirmed y el Downlink no lo confirma (o no se recibió Downlink (LORA_UP_OK)
 		 * o falló la transmisión del Uplink (LORA_ERR_COMMS)) se reintenta LORAWAN_CONFIRMED_RETRIES veces */
-		if(confirmed && !(downlink.confirming) && (retries > 0)) {
-			DPRINT("LORAWAN: UPLINK CONFIRMED SIN ACUSE DE RECIBO. REINTENTANDO EN 5 SEGUNDOS \n\r");
+		if((retries > 0) && !(downlink.confirming)) {
+			DPRINT("LORAWAN: UPLINK CONFIRMED SIN ACUSE DE RECIBO \n\r");
+			retries--;
 			HAL_Delay(5000);
 		}
-		retries--;
-	} while(confirmed && !(downlink.confirming) && (retries > 0));
+	} while((retries > 0) && !(downlink.confirming));
 
 	if(system_reboot) {
 		DPRINT("LORAWAN: COMANDO PARA EL REINICIO DEL SISTEMA. REINICIANDO ... \n\r");

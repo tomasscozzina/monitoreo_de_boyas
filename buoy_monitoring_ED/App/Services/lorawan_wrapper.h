@@ -15,7 +15,8 @@ extern "C"
 		LORA_JOIN_OK  =  0,   	/* La activación (JOIN) fue exitosa */
 		LORA_UP_OK,				/* Se transmitió Uplink SIN recepción de Downlink */
 		LORA_DOWN_AVAILABLE,	/* Se transmitió Uplink CON recepción de Downlink */
-		LORA_ERR_COMMS,			/* La comunicación con el Network Server (NS) falló */
+		LORA_ERR_JOIN,          /* La activación no se completó o se perdió la sesión */
+		LORA_ERR_COMMS,         /* Falló la comunicación con el transceptor */
 	} LoRaWAN_Status_t;
 
     typedef struct {

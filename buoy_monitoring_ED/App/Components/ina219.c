@@ -45,7 +45,7 @@
 #define INA219_COMMS_REINTENTOS	 5
 
 /* Correción de OFFSET en medición de VBUS (mide 12 mV de más) */
-#define OFSET_CORRECTION  12
+#define OFFSET_CORRECTION  0
 
 /* Variables privadas */
 static const uint8_t s_i2c_addrs[INA219_COUNT] = {
@@ -194,7 +194,7 @@ static Energy_Status_t INA219_getVoltage(INA219_Channel ch, int16_t *voltage_mV)
     }
 
     uint16_t bus_val = raw >> MASK_BUS_VOLTAGE_SHIFT;	// Bits [15:3] = BUS_VOLTAGE
-    *voltage_mV = (bus_val * 4) - OFSET_CORRECTION;		// LSB = 4 mV
+    *voltage_mV = (bus_val * 4) - OFFSET_CORRECTION;		// LSB = 4 mV
 
     return ENERGY_OK;
 }

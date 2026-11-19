@@ -1,5 +1,5 @@
 /******************************************************************************
- * @file    neo6m.c
+| * @file    neo6m.c
  * @author  Tomás Agustín Scozzina
  * @date    23 jun 2026
  * @brief   Driver del módulo GPS neo6m de uBlox
@@ -16,14 +16,12 @@
 /* Cabeceras de las clases esperadas en cada respuesta */
 #define UBX_MON						0x0A
 #define UBX_NAV						0x01
-#define UBX_RXM						0x02
 
 /* Cabeceras de los mensajes esperados en cada respuesta */
 #define UBX_MON_HW					0x09
 #define UBX_NAV_STATUS				0x03
 #define UBX_NAV_POSLLH				0x02
 #define UBX_NAV_TIMEUTC				0x21
-#define UBX_RXM_PMREQ				0x41
 
 /* Tamaños de payload esperados en cada respuesta */
 #define UBX_PAYLOAD_MON_HW        	68

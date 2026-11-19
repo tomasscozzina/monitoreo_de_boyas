@@ -28,10 +28,11 @@ typedef struct __attribute__((packed)) {
     uint8_t  impactThreshold;   // 1 byte
     int16_t  lanternMin_mV;     // 2 bytes
     int16_t  lanternMin_mA;     // 2 bytes
+    int16_t  panelDay_mV;       // 2 bytes
     uint8_t  lanternPeriod_s;   // 1 byte
     uint8_t  gpsTimecap_s;      // 1 byte
     uint8_t  txPeriod_min;      // 1 byte
-    uint8_t  reserved[3];       // Relleno para alinear a 48 bytes (múltiplo de 8 bytes)
+    uint8_t  reserved[1];       // Relleno para alinear a 48 bytes (múltiplo de 8 bytes)
 } parameters_t;
 
 /* Variable global accesible desde toda la aplicación */
